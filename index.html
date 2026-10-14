@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#BFE3FF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="سباق العربية">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>html,body{margin:0;padding:0}</style>
+<title>سباق العربية</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@600;700;800&family=Noto+Naskh+Arabic:wght@500;700&display=swap">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+/* Layout: one full-screen WebGL canvas (garage turntable, then the city race) with HTML overlays — garage menu, race HUD (lap, place, stars, speed, minimap), question panel with lane chips, steer pads, and bright lesson cards (story, sentence workshop, notebook). Single bright theme by choice: the family asked for light, colourful screens only. */
+:root{
+  --sky:#BFE3FF; --paper:#FFFBEF; --ink:#2B2A33; --muted:#6B6878; --gold:#FFD23F; --good:#2BB673; --coral:#FF6B57; --mint:#2EC4B6; --grape:#8E7CFF; --sea:#3FA2FF; --maroon:#8A1538;
+  --lane0:#FFD23F; --lane1:#5CE1E6; --lane2:#FF9EC7;
+  --display:'Baloo Bhaijaan 2',system-ui,sans-serif; --read:'Noto Naskh Arabic','Amiri','Traditional Arabic',serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{margin:0;background:var(--sky);color:var(--ink);font-family:var(--display);direction:rtl;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none;-webkit-user-select:none}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
+input{font-family:inherit;color:inherit}
+#gl{position:fixed;inset:0}
+#gl canvas{display:block;width:100%;height:100%;touch-action:none}
+.pill{background:var(--paper);border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink);border-radius:12px;padding:2px 10px;font-weight:800;font-size:18px;display:flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill.bump{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+.icon{width:44px;height:44px;font-size:20px;background:var(--paper);border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink);border-radius:12px;display:grid;place-items:center}
+.icon:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+/* garage */
+#garage{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
+#garage > *{pointer-events:auto}
+.gtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gtop .grow{flex:1}
+.logo{font-size:30px;font-weight:800;line-height:1;background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:0 5px 0 var(--ink);padding:6px 14px}
+.logo span{color:var(--coral)}
+.gbottom{display:flex;flex-direction:column;align-items:center;gap:8px;max-width:520px;width:100%;margin:0 auto}
+.carname{display:flex;align-items:center;gap:10px;width:100%;justify-content:center}
+.carname b{font-size:26px;font-weight:800;background:var(--paper);border:3px solid var(--ink);border-radius:12px;padding:2px 16px;min-width:180px;text-align:center;box-shadow:0 4px 0 var(--ink)}
+.arrow{width:58px;height:58px;font-size:28px;border-radius:50%;background:var(--gold);border:3px solid var(--ink);box-shadow:0 5px 0 var(--ink)}
+.arrow:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.swatches{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;direction:ltr}
+.sw{width:38px;height:38px;border-radius:50%;border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
+.sw.sel{outline:4px solid #fff;outline-offset:2px;transform:scale(1.12)}
+.sw.off{opacity:.25;pointer-events:none}
+.stats{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.menu{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.mbtn{min-height:62px;border:3px solid var(--ink);border-radius:14px;box-shadow:0 5px 0 var(--ink);background:var(--paper);font-weight:800;font-size:17px;line-height:1.15;padding:6px}
+.mbtn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.mbtn small{display:block;font-size:12px;color:var(--muted)}
+.go{width:100%;min-height:68px;font-size:26px;font-weight:800;border:3px solid var(--ink);border-radius:16px;box-shadow:0 6px 0 var(--ink);background:linear-gradient(#FFE36E,#FFC21A);animation:pulse 1.4s ease-in-out infinite}
+.go:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+input.nm{width:100%;max-width:280px;font-size:20px;font-weight:700;text-align:center;padding:6px 12px;border:3px solid var(--ink);border-radius:10px;background:#fff}
+/* race HUD */
+.hud{position:fixed;top:0;left:0;right:0;padding:calc(8px + env(safe-area-inset-top,0px)) 10px 0;display:flex;align-items:flex-start;gap:6px;pointer-events:none;z-index:5;flex-wrap:wrap}
+.hud > *{pointer-events:auto}
+.hud .grow{flex:1}
+#mini{position:fixed;left:10px;top:calc(62px + env(safe-area-inset-top,0px));width:104px;height:104px;border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);z-index:5;background:#E9F6E1}
+.speedo{position:fixed;right:12px;bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:5;background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:2px 10px;text-align:center;font-weight:800;direction:ltr;pointer-events:none}
+.speedo b{font-size:30px;line-height:1;display:block;font-variant-numeric:tabular-nums}
+.speedo small{font-size:12px;color:var(--muted)}
+.boostbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;font-weight:800;font-size:20px;background:var(--gold);border:3px solid var(--ink);border-radius:999px;padding:4px 18px;box-shadow:0 4px 0 var(--ink);animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+.pad{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));width:110px;height:110px;border-radius:50%;background:rgba(255,251,239,.72);border:4px solid var(--ink);box-shadow:0 6px 0 var(--ink);z-index:6;font-size:46px;display:grid;place-items:center;touch-action:none}
+.pad.l{left:14px}.pad.r{right:14px}
+.pad.on{background:var(--gold);transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+.horn{position:fixed;bottom:calc(136px + env(safe-area-inset-bottom,0px));left:22px;z-index:6;width:62px;height:62px;border-radius:50%;background:var(--paper);border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink);font-size:28px}
+.horn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+#qpanel{position:fixed;top:calc(62px + env(safe-area-inset-top,0px));left:10px;right:10px;margin-inline:auto;max-width:560px;z-index:7;background:var(--paper);border:4px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 var(--ink);padding:8px 10px;display:flex;flex-direction:column;gap:6px;align-items:center;animation:drop .45s cubic-bezier(.3,1.5,.5,1)}
+#qpanel .qhead{display:flex;align-items:center;gap:8px;width:100%;justify-content:center}
+#qpanel .tag{font-size:14px;font-weight:800;color:#fff;background:var(--coral);border-radius:999px;padding:1px 10px}
+#qpanel .qt{font-family:var(--read);font-size:22px;font-weight:700;line-height:1.55;text-align:center;text-wrap:balance}
+#qpanel .qt.stem{font-size:44px;line-height:1.3}
+.blank{display:inline-block;width:.75em;height:1em;vertical-align:-.1em;border:4px dashed var(--coral);border-radius:10px;background:#FFF0EA;margin-inline:.05em}
+.fill{color:#1E7A41;background:#DFF6E6;border-radius:10px;padding-inline:.06em}
+.chips{display:flex;gap:6px;width:100%;direction:ltr}
+.chip{flex:1;min-height:52px;border:3px solid var(--ink);border-radius:12px;box-shadow:0 4px 0 var(--ink);font-family:var(--read);font-weight:700;font-size:20px;line-height:1.3;padding:2px 6px;display:grid;place-items:center;direction:rtl;overflow-wrap:anywhere}
+.chip.c0{background:var(--lane0)}.chip.c1{background:var(--lane1)}.chip.c2{background:var(--lane2)}
+.chip.big{font-size:38px;line-height:1}
+.chip.target{outline:4px solid var(--ink);outline-offset:2px}
+.chip.right{background:#7BE0A5!important;animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.chip.wrong{background:#FFB3B3!important;opacity:.6}
+.say{width:44px;height:44px;font-size:20px;flex:none}
+.toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:9;font-size:44px;font-weight:800;color:#fff;-webkit-text-stroke:2px var(--ink);text-shadow:0 5px 0 var(--ink);pointer-events:none;white-space:nowrap;animation:toast 1.2s ease-out forwards}
+.count{position:fixed;inset:0;display:grid;place-items:center;z-index:9;pointer-events:none;font-size:140px;font-weight:800;color:#fff;-webkit-text-stroke:4px var(--ink);text-shadow:0 8px 0 var(--ink)}
+.count span{animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
+/* cards */
+.overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(191,227,255,.55)}
+.card{width:100%;max-width:480px;max-height:100%;overflow:auto;background:var(--paper);border:3px solid var(--ink);border-radius:16px;box-shadow:0 8px 0 var(--ink);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.card > *{flex-shrink:0}
+.card h1{margin:0;font-size:30px;font-weight:800;line-height:1.15;text-wrap:balance}
+.card h2{margin:0;font-size:22px;font-weight:800;line-height:1.25;text-wrap:balance}
+.card p{margin:0;font-size:17px;color:var(--muted);font-weight:700}
+.card p.again{color:var(--coral)}
+.who{display:flex;align-items:center;gap:8px;background:#EAF6FF;border:2px solid var(--ink);border-radius:999px;padding:3px 14px;font-weight:800;font-size:17px}
+.qtext{font-family:var(--read);font-size:27px;font-weight:700;line-height:1.7;margin:0;text-wrap:balance}
+.row{display:flex;gap:10px;width:100%;justify-content:center;flex-wrap:wrap}
+.choice{flex:1 1 40%;min-width:120px;min-height:64px;border:3px solid var(--ink);border-radius:12px;box-shadow:0 6px 0 var(--ink);background:#FFF4C2;font-family:var(--read);font-weight:700;font-size:21px;line-height:1.5;display:grid;place-items:center;padding:6px 10px;overflow-wrap:anywhere}
+.choice:nth-child(2){background:#DDF6FF}.choice:nth-child(3){background:#FFE3F0}
+.choice.long{flex-basis:100%}
+.choice:active{transform:translateY(4px);box-shadow:0 2px 0 var(--ink)}
+.choice.right{background:#DFF6E6!important;box-shadow:0 6px 0 var(--good);color:#1E7A41;animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.choice.wrong{background:#FFF0F0!important;opacity:.45;animation:shake .4s;pointer-events:none}
+.choice.hint{animation:glow 1s ease-in-out infinite}
+.btn{min-height:56px;border:3px solid var(--ink);border-radius:12px;box-shadow:0 5px 0 var(--ink);font-size:20px;font-weight:800;display:grid;place-items:center;padding:8px 22px;background:var(--gold)}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.btn.wide{width:100%}.btn.soft{background:var(--paper)}
+.bar{width:100%;height:18px;border:3px solid var(--ink);border-radius:8px;background:#fff;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--mint);transition:width .3s}
+.story{width:100%;display:flex;flex-direction:column;gap:6px;text-align:right}
+.sline{display:flex;align-items:center;gap:8px;border:2px solid #E3D9C2;border-radius:12px;padding:6px 8px;background:#fff}
+.sline .t{font-family:var(--read);font-size:21px;line-height:1.8;flex:1}
+.sline.cur{background:#FFF4C2;border-color:var(--ink)}
+.sline button{flex:none;width:40px;height:40px;border:2px solid var(--ink);border-radius:10px;background:#EAF6FF;font-size:18px}
+.stitle{font-family:var(--read);font-size:30px;font-weight:700;color:#1E6FB8}
+.slots{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:70px;width:100%;padding:8px;border:3px dashed #C9BBA3;border-radius:14px;background:#F6F0E2;direction:rtl}
+.wslot{font-family:var(--read);font-weight:700;font-size:24px;border:3px solid var(--ink);border-radius:10px;padding:2px 12px;background:#fff;animation:pop .3s cubic-bezier(.3,1.6,.5,1);display:flex;flex-direction:column;align-items:center;line-height:1.5}
+.wslot small{font-family:var(--display);font-size:13px;font-weight:800;border-radius:999px;padding:0 8px;color:#fff}
+.wslot.v{background:#DDF0FF}.wslot.v small{background:#3FA2FF}
+.wslot.s{background:#E2F8E9}.wslot.s small{background:#2BB673}
+.wpool{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%}
+.wblock{font-family:var(--read);font-weight:700;font-size:24px;border:3px solid var(--ink);border-radius:12px;box-shadow:0 5px 0 var(--ink);background:#FFF4C2;padding:4px 14px;min-height:56px}
+.wblock:nth-child(3n+2){background:#DDF6FF}.wblock:nth-child(3n){background:#FFE3F0}
+.wblock:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.wblock.used{opacity:.2;pointer-events:none;box-shadow:none}
+.wblock.wrong{animation:shake .4s}.wblock.hint{animation:glow 1s ease-in-out infinite}
+.book{max-width:540px;align-items:stretch;text-align:right;gap:12px}
+.book h1{text-align:center}
+.sec{border:3px solid var(--ink);border-radius:14px;overflow:hidden}
+.sec > h3{margin:0;padding:6px 12px;font-size:19px;font-weight:800;color:#fff}
+.sec .body{padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#fff}
+.sec.c1 > h3{background:#3FA2FF}.sec.c2 > h3{background:#8E7CFF}.sec.c3 > h3{background:#FF6B57}.sec.c4 > h3{background:#2BB673}.sec.c5 > h3{background:#E39B00}
+.wcard{border:2px solid var(--ink);border-radius:10px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;background:#FFFBEF;min-width:0}
+.wcard div{font-family:var(--read);font-size:19px;line-height:1.5;min-width:0}
+.wcard button{flex:none;width:36px;height:36px;border:2px solid var(--ink);border-radius:8px;background:#EAF6FF;font-size:16px}
+.tip{grid-column:1/-1;font-size:16px;font-weight:700;line-height:1.7}
+.tip .read{font-family:var(--read);font-size:19px}
+.prog{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-weight:800;font-size:15px}
+.prog .bar{height:16px;border-width:2px}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;direction:ltr;height:150px}
+.pod{width:84px;border:3px solid var(--ink);border-radius:10px 10px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:4px;font-weight:800;font-size:15px;line-height:1.1}
+.pod b{font-size:30px}
+.credits{font-size:11px;color:var(--muted);line-height:1.4}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:12;width:100%;height:100%}
+#loading{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(#DDF3FF,#BFE3FF)}
+@keyframes pop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+@keyframes drop{0%{transform:translateY(-40px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes glow{0%,100%{box-shadow:0 6px 0 var(--ink),0 0 0 0 #FFD23F}50%{box-shadow:0 6px 0 var(--ink),0 0 0 8px #FFD23F}}
+@keyframes toast{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}20%{transform:translate(-50%,-50%) scale(1.1);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-90%) scale(1);opacity:0}}
+@media (orientation:landscape) and (max-height:520px){.gbottom{position:absolute;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));width:min(48%,430px);gap:6px}.gbottom input.nm{display:none}.go{min-height:54px;font-size:22px}.mbtn{min-height:52px;font-size:15px}.carname b{font-size:20px;min-width:140px}.arrow{width:46px;height:46px;font-size:22px}.sw{width:32px;height:32px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:420px){.qtext{font-size:23px}#qpanel .qt{font-size:19px}#qpanel .qt.stem{font-size:38px}.chip{font-size:17px}.pad{width:96px;height:96px;font-size:40px}.logo{font-size:24px}.carname b{font-size:21px;min-width:140px}.pill{font-size:16px;padding:2px 7px}}
+</style>
+</head>
+<body>
+
+
+<div id="gl"></div>
+<div id="loading"><div class="card"><h1>سباق العربية 🏎️</h1><p id="loadMsg">جاري تجهيز السيارات…</p><div class="bar"><i id="loadBar"></i></div></div></div>
+
+<div id="garage" hidden>
+  <div class="gtop">
+    <div class="logo">سباق <span>العربية</span> 🏁</div>
+    <span class="grow"></span>
+    <div class="pill">⭐ <b class="starsN">0</b></div>
+    <div class="pill">🏆 <b id="winsN">0</b></div>
+    <button class="icon" id="gSound" aria-label="الصوت">🔊</button>
+  </div>
+  <div class="gbottom">
+    <div class="carname"><button class="arrow" id="carPrev" aria-label="السيارة السابقة">▶</button><b id="carName"></b><button class="arrow" id="carNext" aria-label="السيارة التالية">◀</button></div>
+    <div class="swatches" id="swatches"></div>
+    <input class="nm" id="nameInput" maxlength="14" placeholder="اسم السائق (اختياري)" autocomplete="off">
+    <button class="go" id="btnRace">🏁 ابدأ السباق</button>
+    <div class="menu">
+      <button class="mbtn" id="btnStory">📖 القصة<small>في حديقة الحي</small></button>
+      <button class="mbtn" id="btnWork">🧩 ورشة الجمل<small>الجملة الفعلية</small></button>
+      <button class="mbtn" id="btnBook">📒 الدفتر<small>القواعد</small></button>
+    </div>
+  </div>
+</div>
+
+<div class="hud" id="hud" hidden>
+  <div class="pill" id="lapPill">🏁 <b id="lapN">1/2</b></div>
+  <div class="pill" id="posPill">🥇 <b id="posN">1/4</b></div>
+  <div class="pill" id="starPill">⭐ <b class="starsN">0</b></div>
+  <span class="grow"></span>
+  <button class="icon" id="rSound" aria-label="الصوت">🔊</button>
+  <button class="icon" id="rPause" aria-label="إيقاف">⏸️</button>
+</div>
+<canvas id="mini" width="120" height="120" hidden></canvas>
+<div class="speedo" id="speedo" hidden><b id="spd">0</b><small>كم/س</small></div>
+<button class="pad l" id="padL" hidden aria-label="يسار">⬅️</button>
+<button class="pad r" id="padR" hidden aria-label="يمين">➡️</button>
+<button class="horn" id="horn" hidden aria-label="البوري">📯</button>
+<div id="qpanel" hidden></div>
+<div id="boost" class="boostbar" hidden>🔥 نيترو!</div>
+<div class="overlay" id="modal" hidden><div class="card" id="mcard"></div></div>
+<canvas id="confetti"></canvas>
+
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const $=s=>document.querySelector(s);
+
+/* ================= lesson ================= */
+const LESSON={"Q":[{"id":"typ0","cat":"fi","q":"«ذَهَبَ سالِمٌ إِلى الحَديقَةِ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ0_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"فِعْلِيَّة","explain":"typ0_a","lane":true,"sentence":"ذَهَبَ سالِمٌ إِلى الحَديقَةِ"},{"id":"typ1","cat":"fi","q":"«الحَديقَةُ واسِعَةٌ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ1_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"اسْمِيَّة","explain":"typ1_a","lane":true,"sentence":"الحَديقَةُ واسِعَةٌ"},{"id":"typ2","cat":"fi","q":"«يَلْعَبُ الأَطْفالُ بِالكُرَةِ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ2_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"فِعْلِيَّة","explain":"typ2_a","lane":true,"sentence":"يَلْعَبُ الأَطْفالُ بِالكُرَةِ"},{"id":"typ3","cat":"fi","q":"«الأَزْهارُ مُلَوَّنَةٌ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ3_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"اسْمِيَّة","explain":"typ3_a","lane":true,"sentence":"الأَزْهارُ مُلَوَّنَةٌ"},{"id":"typ4","cat":"fi","q":"«سَقى البُسْتانِيُّ الشَّجَرَ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ4_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"فِعْلِيَّة","explain":"typ4_a","lane":true,"sentence":"سَقى البُسْتانِيُّ الشَّجَرَ"},{"id":"typ5","cat":"fi","q":"«الجَوُّ جَميلٌ» جُمْلَةٌ فِعْلِيَّةٌ أَمِ اسْمِيَّة؟","say":"typ5_q","options":["فِعْلِيَّة","اسْمِيَّة"],"answer":"اسْمِيَّة","explain":"typ5_a","lane":true,"sentence":"الجَوُّ جَميلٌ"},{"id":"vrb0","cat":"fi","q":"ما الفِعْلُ في: «جَلَسَ الجَدُّ عَلى المَقْعَدِ»؟","say":"vrb0_q","options":["جَلَسَ","الجَدُّ","المَقْعَدِ"],"answer":"جَلَسَ","explain":"vrb0_a","lane":true,"sentence":"جَلَسَ الجَدُّ عَلى المَقْعَدِ"},{"id":"vrb1","cat":"fi","q":"ما الفِعْلُ في: «شَرِبَ القِطُّ الحَليبَ»؟","say":"vrb1_q","options":["شَرِبَ","القِطُّ","الحَليبَ"],"answer":"شَرِبَ","explain":"vrb1_a","lane":true,"sentence":"شَرِبَ القِطُّ الحَليبَ"},{"id":"vrb2","cat":"fi","q":"ما الفِعْلُ في: «تَطيرُ العَصافيرُ فَوْقَ الشَّجَرَةِ»؟","say":"vrb2_q","options":["تَطيرُ","العَصافيرُ","الشَّجَرَةِ"],"answer":"تَطيرُ","explain":"vrb2_a","lane":true,"sentence":"تَطيرُ العَصافيرُ فَوْقَ الشَّجَرَةِ"},{"id":"vrb3","cat":"fi","q":"ما الفِعْلُ في: «رَكَضَتْ لَيْلى في المَلْعَبِ»؟","say":"vrb3_q","options":["رَكَضَتْ","لَيْلى","المَلْعَبِ"],"answer":"رَكَضَتْ","explain":"vrb3_a","lane":true,"sentence":"رَكَضَتْ لَيْلى في المَلْعَبِ"},{"id":"sbj0","cat":"fi","q":"مَنِ الفاعِلُ في: «لَعِبَ الوَلَدُ بِالكُرَةِ»؟","say":"sbj0_q","options":["لَعِبَ","الوَلَدُ","بِالكُرَةِ"],"answer":"الوَلَدُ","explain":"sbj0_a","lane":true,"sentence":"لَعِبَ الوَلَدُ بِالكُرَةِ"},{"id":"sbj1","cat":"fi","q":"مَنِ الفاعِلُ في: «سَقى البُسْتانِيُّ الأَزْهارَ»؟","say":"sbj1_q","options":["سَقى","البُسْتانِيُّ","الأَزْهارَ"],"answer":"البُسْتانِيُّ","explain":"sbj1_a","lane":true,"sentence":"سَقى البُسْتانِيُّ الأَزْهارَ"},{"id":"sbj2","cat":"fi","q":"مَنِ الفاعِلُ في: «قَرَأَتْ مُنى القِصَّةَ»؟","say":"sbj2_q","options":["قَرَأَتْ","مُنى","القِصَّةَ"],"answer":"مُنى","explain":"sbj2_a","lane":true,"sentence":"قَرَأَتْ مُنى القِصَّةَ"},{"id":"sbj3","cat":"fi","q":"مَنِ الفاعِلُ في: «يَأْكُلُ الأَرْنَبُ الجَزَرَ»؟","say":"sbj3_q","options":["يَأْكُلُ","الأَرْنَبُ","الجَزَرَ"],"answer":"الأَرْنَبُ","explain":"sbj3_a","lane":true,"sentence":"يَأْكُلُ الأَرْنَبُ الجَزَرَ"},{"id":"fil0","cat":"fi","q":"أَكْمِلْ بِفِعْلٍ مُناسِب: «ـــــ العُصْفورُ فَوْقَ الشَّجَرَةِ»","say":"fil0_q","options":["غَرَّدَ","كَتَبَ","قَرَأَ"],"answer":"غَرَّدَ","explain":"fil0_a","lane":true},{"id":"fil1","cat":"fi","q":"أَكْمِلْ بِفِعْلٍ مُناسِب: «ـــــ الطّالِبُ الدَّرْسَ»","say":"fil1_q","options":["كَتَبَ","سَبَحَ","غَرَّدَ"],"answer":"كَتَبَ","explain":"fil1_a","lane":true},{"id":"fil2","cat":"fi","q":"أَكْمِلْ بِفِعْلٍ مُناسِب: «ـــــ السَّمَكُ في الماءِ»","say":"fil2_q","options":["يَسْبَحُ","يَطيرُ","يَقْرَأُ"],"answer":"يَسْبَحُ","explain":"fil2_a","lane":true},{"id":"fil3","cat":"fi","q":"أَكْمِلْ بِفِعْلٍ مُناسِب: «ـــــ الأُمُّ الطَّعامَ»","say":"fil3_q","options":["طَبَخَتْ","طارَتْ","سَبَحَتْ"],"answer":"طَبَخَتْ","explain":"fil3_a","lane":true},{"id":"pck0","cat":"fi","q":"اخْتَرِ الجُمْلَةَ الفِعْلِيَّة","say":"pck0_q","options":["نامَ الطِّفْلُ","الطِّفْلُ نائِمٌ","الطِّفْلُ صَغيرٌ"],"answer":"نامَ الطِّفْلُ","explain":"pck0_a","lane":false},{"id":"pck1","cat":"fi","q":"اخْتَرِ الجُمْلَةَ الفِعْلِيَّة","say":"pck1_q","options":["يَقْرَأُ أَحْمَدُ الكِتابَ","أَحْمَدُ طالِبٌ","الكِتابُ مُفيدٌ"],"answer":"يَقْرَأُ أَحْمَدُ الكِتابَ","explain":"pck1_a","lane":false},{"id":"pck2","cat":"fi","q":"اخْتَرِ الجُمْلَةَ الفِعْلِيَّة","say":"pck2_q","options":["تَسيرُ السَّيّارَةُ بِسُرْعَةٍ","السَّيّارَةُ سَريعَةٌ","الطَّريقُ طَويلٌ"],"answer":"تَسيرُ السَّيّارَةُ بِسُرْعَةٍ","explain":"pck2_a","lane":false},{"id":"alf0","cat":"alif","q":"مَشـ","say":"alf0_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"مَشى","lane":true},{"id":"alf1","cat":"alif","q":"يَمْشـ","say":"alf1_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"يَمْشي","lane":true},{"id":"alf2","cat":"alif","q":"بَكـ","say":"alf2_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"بَكى","lane":true},{"id":"alf3","cat":"alif","q":"يَبْكـ","say":"alf3_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"يَبْكي","lane":true},{"id":"alf4","cat":"alif","q":"رَمـ","say":"alf4_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"رَمى","lane":true},{"id":"alf5","cat":"alif","q":"يَرْمـ","say":"alf5_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"يَرْمي","lane":true},{"id":"alf6","cat":"alif","q":"سَقـ","say":"alf6_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"سَقى","lane":true},{"id":"alf7","cat":"alif","q":"يَسْقـ","say":"alf7_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"يَسْقي","lane":true},{"id":"alf8","cat":"alif","q":"جَر","say":"alf8_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"جَرى","lane":true},{"id":"alf9","cat":"alif","q":"يَجْر","say":"alf9_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"يَجْري","lane":true},{"id":"alf10","cat":"alif","q":"عَلـ","say":"alf10_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"عَلى","lane":true},{"id":"alf11","cat":"alif","q":"فـ","say":"alf11_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"في","lane":true},{"id":"alf12","cat":"alif","q":"لَيْلـ","say":"alf12_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"لَيْلى","lane":true},{"id":"alf13","cat":"alif","q":"الرّاعـ","say":"alf13_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"الرّاعي","lane":true},{"id":"alf14","cat":"alif","q":"مُسْتَشْفـ","say":"alf14_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"مُسْتَشْفى","lane":true},{"id":"alf15","cat":"alif","q":"النّاد","say":"alf15_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"النّادي","lane":true},{"id":"alf16","cat":"alif","q":"حَلْو","say":"alf16_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"حَلْوى","lane":true},{"id":"alf17","cat":"alif","q":"القاضـ","say":"alf17_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"القاضي","lane":true},{"id":"alf18","cat":"alif","q":"مَبْنـ","say":"alf18_w","options":["ى","ي"],"answer":"ى","explain":"ev_maqsura","word":"مَبْنى","lane":true},{"id":"alf19","cat":"alif","q":"الواد","say":"alf19_w","options":["ى","ي"],"answer":"ي","explain":"ev_yaa","word":"الوادي","lane":true},{"id":"tls0","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls0_w","options":["بابٌ","بابًا","بابٍ"],"answer":"بابٌ","explain":"ev_tdamm","word":"بابٌ","lane":true,"listen":true},{"id":"tls1","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls1_w","options":["قَلَمٌ","قَلَمًا","قَلَمٍ"],"answer":"قَلَمًا","explain":"ev_tfath","word":"قَلَمًا","lane":true,"listen":true},{"id":"tls2","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls2_w","options":["كِتابٌ","كِتابًا","كِتابٍ"],"answer":"كِتابٍ","explain":"ev_tkasr","word":"كِتابٍ","lane":true,"listen":true},{"id":"tls3","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls3_w","options":["وَلَدٌ","وَلَدًا","وَلَدٍ"],"answer":"وَلَدٌ","explain":"ev_tdamm","word":"وَلَدٌ","lane":true,"listen":true},{"id":"tls4","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls4_w","options":["عُصْفورٌ","عُصْفورًا","عُصْفورٍ"],"answer":"عُصْفورًا","explain":"ev_tfath","word":"عُصْفورًا","lane":true,"listen":true},{"id":"tls5","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls5_w","options":["بَيْتٌ","بَيْتًا","بَيْتٍ"],"answer":"بَيْتٍ","explain":"ev_tkasr","word":"بَيْتٍ","lane":true,"listen":true},{"id":"tls6","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls6_w","options":["شَمْسٌ","شَمْسًا","شَمْسٍ"],"answer":"شَمْسٌ","explain":"ev_tdamm","word":"شَمْسٌ","lane":true,"listen":true},{"id":"tls7","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls7_w","options":["قَمَرٌ","قَمَرًا","قَمَرٍ"],"answer":"قَمَرًا","explain":"ev_tfath","word":"قَمَرًا","lane":true,"listen":true},{"id":"tls8","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls8_w","options":["شَجَرَةٌ","شَجَرَةً","شَجَرَةٍ"],"answer":"شَجَرَةٍ","explain":"ev_tkasr","word":"شَجَرَةٍ","lane":true,"listen":true},{"id":"tls9","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls9_w","options":["زَهْرَةٌ","زَهْرَةً","زَهْرَةٍ"],"answer":"زَهْرَةٌ","explain":"ev_tdamm","word":"زَهْرَةٌ","lane":true,"listen":true},{"id":"tls10","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls10_w","options":["سَمَكَةٌ","سَمَكَةً","سَمَكَةٍ"],"answer":"سَمَكَةً","explain":"ev_tfath","word":"سَمَكَةً","lane":true,"listen":true},{"id":"tls11","cat":"tanw","q":"اسْمَعْ، وَاخْتَرِ الكَلِمَةَ الصَّحيحَة","say":"tls11_w","options":["حَديقَةٌ","حَديقَةً","حَديقَةٍ"],"answer":"حَديقَةٍ","explain":"ev_tkasr","word":"حَديقَةٍ","lane":true,"listen":true},{"id":"tkd0","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( كَلْبٌ ) ؟","say":"tkd0_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ ضَمّ","explain":"tkd0_a","lane":true,"word":"كَلْبٌ"},{"id":"tkd1","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( تُفّاحَةً ) ؟","say":"tkd1_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ فَتْح","explain":"tkd1_a","lane":true,"word":"تُفّاحَةً"},{"id":"tkd2","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( مَدْرَسَةٍ ) ؟","say":"tkd2_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ كَسْر","explain":"tkd2_a","lane":true,"word":"مَدْرَسَةٍ"},{"id":"tkd3","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( سَيّارَةٌ ) ؟","say":"tkd3_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ ضَمّ","explain":"tkd3_a","lane":true,"word":"سَيّارَةٌ"},{"id":"tkd4","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( كُرَةً ) ؟","say":"tkd4_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ فَتْح","explain":"tkd4_a","lane":true,"word":"كُرَةً"},{"id":"tkd5","cat":"tanw","q":"ما نَوْعُ التَّنْوينِ في كَلِمَةِ ( قِطٍّ ) ؟","say":"tkd5_q","options":["تَنْوينُ ضَمّ","تَنْوينُ فَتْح","تَنْوينُ كَسْر"],"answer":"تَنْوينُ كَسْر","explain":"tkd5_a","lane":true,"word":"قِطٍّ"},{"id":"twr0","cat":"tanw","q":"اخْتَرِ الكِتابَةَ الصَّحيحَة","say":"twr0_q","options":["قَلَمًا","قَلَمً"],"answer":"قَلَمًا","explain":"twr0_a","lane":true},{"id":"twr1","cat":"tanw","q":"اخْتَرِ الكِتابَةَ الصَّحيحَة","say":"twr1_q","options":["شَجَرَةً","شَجَرَةًا"],"answer":"شَجَرَةً","explain":"twr1_a","lane":true},{"id":"twr2","cat":"tanw","q":"اخْتَرِ الكِتابَةَ الصَّحيحَة","say":"twr2_q","options":["بِنْتًا","بِنْتً"],"answer":"بِنْتًا","explain":"twr2_a","lane":true},{"id":"twr3","cat":"tanw","q":"اخْتَرِ الكِتابَةَ الصَّحيحَة","say":"twr3_q","options":["كُرَةً","كُرَةًا"],"answer":"كُرَةً","explain":"twr3_a","lane":true},{"id":"rul0","cat":"rule","q":"التَّنْوينُ نونٌ ساكِنَةٌ…","say":"rul0_q","options":["نَنْطِقُها وَلا نَكْتُبُها","نَكْتُبُها وَلا نَنْطِقُها","لا نَنْطِقُها وَلا نَكْتُبُها"],"answer":"نَنْطِقُها وَلا نَكْتُبُها","explain":"rul0_a","lane":false},{"id":"rul1","cat":"rule","q":"الجُمْلَةُ الفِعْلِيَّةُ تَبْدَأُ بِـ…","say":"rul1_q","options":["فِعْل","اسْم","حَرْف"],"answer":"فِعْل","explain":"rul1_a","lane":true},{"id":"rul2","cat":"rule","q":"الجُمْلَةُ الفِعْلِيَّةُ تَتَكَوَّنُ مِنْ…","say":"rul2_q","options":["فِعْلٍ وَفاعِل","اسْمَيْنِ فَقَط","حَرْفٍ وَاسْم"],"answer":"فِعْلٍ وَفاعِل","explain":"rul2_a","lane":true},{"id":"rul3","cat":"rule","q":"الفاعِلُ هُوَ…","say":"rul3_q","options":["مَنْ قامَ بِالفِعْل","مَكانُ الفِعْل","وَقْتُ الفِعْل"],"answer":"مَنْ قامَ بِالفِعْل","explain":"rul3_a","lane":true},{"id":"rul4","cat":"rule","q":"الأَلِفُ المَقْصورَةُ ( ى ) نَنْطِقُها…","say":"rul4_q","options":["أَلِفًا","ياءً"],"answer":"أَلِفًا","explain":"rul4_a","lane":true},{"id":"rul5","cat":"rule","q":"الياءُ ( ي ) في آخِرِ الكَلِمَةِ…","say":"rul5_q","options":["لَها نُقْطَتان","لَيْسَ لَها نُقَط"],"answer":"لَها نُقْطَتان","explain":"rul5_a","lane":true},{"id":"rul6","cat":"rule","q":"تَنْوينُ الفَتْحِ نَكْتُبُ بَعْدَهُ غالِبًا…","say":"rul6_q","options":["أَلِفًا","واوًا","نونًا"],"answer":"أَلِفًا","explain":"rul6_a","lane":true},{"id":"cmp0","cat":"read","q":"مَتى ذَهَبَ سالِمٌ إِلى الحَديقَة؟","say":"cmp0_q","options":["يَوْمَ الجُمُعَة","يَوْمَ السَّبْت","في اللَّيْل"],"answer":"يَوْمَ الجُمُعَة","explain":"cmp0_a","lane":true},{"id":"cmp1","cat":"read","q":"مَعَ مَنْ ذَهَبَ سالِمٌ إِلى الحَديقَة؟","say":"cmp1_q","options":["مَعَ أُخْتِهِ لَيْلى","مَعَ أَبيه","وَحْدَه"],"answer":"مَعَ أُخْتِهِ لَيْلى","explain":"cmp1_a","lane":true},{"id":"cmp2","cat":"read","q":"كَيْفَ كانَتِ الحَديقَة؟","say":"cmp2_q","options":["واسِعَة","صَغيرَة","مُظْلِمَة"],"answer":"واسِعَة","explain":"cmp2_a","lane":true},{"id":"cmp3","cat":"read","q":"ماذا كانَ الجَدُّ يَفْعَل؟","say":"cmp3_q","options":["يَقْرَأُ كِتابًا","يَلْعَبُ بِالكُرَة","يَسْقي الأَزْهار"],"answer":"يَقْرَأُ كِتابًا","explain":"cmp3_a","lane":true},{"id":"cmp4","cat":"read","q":"مَنْ سَقى الأَزْهار؟","say":"cmp4_q","options":["البُسْتانِيّ","لَيْلى","الجَدّ"],"answer":"البُسْتانِيّ","explain":"cmp4_a","lane":true},{"id":"cmp5","cat":"read","q":"ماذا رَمى الوَلَدُ عَلى الأَرْض؟","say":"cmp5_q","options":["وَرَقَة","كُرَة","زَهْرَة"],"answer":"وَرَقَة","explain":"cmp5_a","lane":true},{"id":"cmp6","cat":"read","q":"ماذا قالَ سالِمٌ لِلْوَلَد؟","say":"cmp6_q","options":["الحَديقَةُ بَيْتُنا جَميعًا","هَيّا نَلْعَب","أَنا جائِع"],"answer":"الحَديقَةُ بَيْتُنا جَميعًا","explain":"cmp6_a","lane":false},{"id":"cmp7","cat":"read","q":"أَيْنَ وَضَعَ الوَلَدُ الوَرَقَة؟","say":"cmp7_q","options":["في سَلَّةِ المُهْمَلات","تَحْتَ الشَّجَرَة","في جَيْبِه"],"answer":"في سَلَّةِ المُهْمَلات","explain":"cmp7_a","lane":true},{"id":"cmp8","cat":"read","q":"كَيْفَ رَجَعَ سالِمٌ وَلَيْلى إِلى البَيْت؟","say":"cmp8_q","options":["فَرِحَيْن","حَزينَيْن","غاضِبَيْن"],"answer":"فَرِحَيْن","explain":"cmp8_a","lane":true},{"id":"cmp9","cat":"read","q":"ماذا نَتَعَلَّمُ مِنَ القِصَّة؟","say":"cmp9_q","options":["أَنْ نُحافِظَ عَلى نَظافَةِ الحَديقَة","أَنْ نَرْمِيَ الأَوْراق","أَنْ نَبْقى في البَيْت"],"answer":"أَنْ نُحافِظَ عَلى نَظافَةِ الحَديقَة","explain":"cmp9_a","lane":false},{"id":"voc0","cat":"read","q":"ما مَعْنى ( البُسْتانِيّ ) ؟","say":"voc0_q","options":["الَّذي يَعْتَني بِالأَشْجارِ وَالأَزْهار","بائِعُ الخُبْز","سائِقُ الحافِلَة"],"answer":"الَّذي يَعْتَني بِالأَشْجارِ وَالأَزْهار","explain":"voc0_a","lane":false},{"id":"voc1","cat":"read","q":"ما مَعْنى عِبارَةِ ( سَلَّةُ المُهْمَلات ) ؟","say":"voc1_q","options":["مَكانٌ نَضَعُ فيهِ الأَوْراقَ وَالقُمامَة","صُنْدوقُ الأَلْعاب","كيسُ الخُبْز"],"answer":"مَكانٌ نَضَعُ فيهِ الأَوْراقَ وَالقُمامَة","explain":"voc1_a","lane":false},{"id":"voc2","cat":"read","q":"ما مَعْنى ( الحَيّ ) ؟","say":"voc2_q","options":["المَكانُ الَّذي نَسْكُنُ فيه","الغابَة","البَحْر"],"answer":"المَكانُ الَّذي نَسْكُنُ فيه","explain":"voc2_a","lane":false},{"id":"voc3","cat":"read","q":"ما ضِدُّ ( واسِعَة ) ؟","say":"voc3_q","options":["ضَيِّقَة","كَبيرَة","جَميلَة"],"answer":"ضَيِّقَة","explain":"voc3_a","lane":true},{"id":"voc4","cat":"read","q":"ما ضِدُّ ( فَرِحَيْن ) ؟","say":"voc4_q","options":["حَزينَيْن","سَعيدَيْن","سَريعَيْن"],"answer":"حَزينَيْن","explain":"voc4_a","lane":true},{"id":"voc5","cat":"read","q":"ما ضِدُّ ( عالِيَة ) ؟","say":"voc5_q","options":["قَصيرَة","كَبيرَة","خَضْراء"],"answer":"قَصيرَة","explain":"voc5_a","lane":true}],"O":[{"id":"ord0","w":["ذَهَبَ","سالِمٌ","إِلى","الحَديقَةِ"],"say":"ord0"},{"id":"ord1","w":["لَعِبَ","الأَطْفالُ","بِالكُرَةِ"],"say":"ord1"},{"id":"ord2","w":["سَقى","البُسْتانِيُّ","الأَزْهارَ"],"say":"ord2"},{"id":"ord3","w":["شَرِبَ","القِطُّ","الحَليبَ"],"say":"ord3"},{"id":"ord4","w":["غَرَّدَ","العُصْفورُ","فَوْقَ","الشَّجَرَةِ"],"say":"ord4"},{"id":"ord5","w":["قَرَأَتْ","لَيْلى","القِصَّةَ"],"say":"ord5"},{"id":"ord6","w":["يَسْبَحُ","السَّمَكُ","في","الماءِ"],"say":"ord6"},{"id":"ord7","w":["رَكِبَ","أَبي","السَّيّارَةَ"],"say":"ord7"},{"id":"ord8","w":["فازَ","السّائِقُ","بِالسِّباقِ"],"say":"ord8"},{"id":"ord9","w":["تَسيرُ","السَّيّارَةُ","في","الشّارِعِ"],"say":"ord9"}],"S":[{"id":"st0","t":"في يَوْمِ الجُمُعَةِ، ذَهَبَ سالِمٌ مَعَ أُخْتِهِ لَيْلى إِلى حَديقَةِ الحَيّ.","say":"st0"},{"id":"st1","t":"الحَديقَةُ واسِعَةٌ، فيها أَشْجارٌ عالِيَةٌ وَأَزْهارٌ مُلَوَّنَةٌ.","say":"st1"},{"id":"st2","t":"جَلَسَ جَدٌّ عَلى مَقْعَدٍ خَشَبِيٍّ يَقْرَأُ كِتابًا.","say":"st2"},{"id":"st3","t":"لَعِبَ الأَطْفالُ بِالكُرَةِ، وَرَكَضَ سالِمٌ حَتّى تَعِبَ.","say":"st3"},{"id":"st4","t":"سَقى البُسْتانِيُّ الأَزْهارَ، فَشَكَرَتْهُ لَيْلى.","say":"st4"},{"id":"st5","t":"رَمى وَلَدٌ وَرَقَةً عَلى الأَرْضِ، فَقالَ لَهُ سالِمٌ: الحَديقَةُ بَيْتُنا جَميعًا، لِنُحافِظْ عَلَيْها.","say":"st5"},{"id":"st6","t":"وَضَعَ الوَلَدُ الوَرَقَةَ في سَلَّةِ المُهْمَلاتِ، وَابْتَسَمَ.","say":"st6"},{"id":"st7","t":"رَجَعَ سالِمٌ وَلَيْلى إِلى البَيْتِ فَرِحَيْن.","say":"st7"}],"title":"في حَديقَةِ الحَيّ"};
+const QS=LESSON.Q, ORDER=LESSON.O, STORY=LESSON.S;
+const CAT_NAME={fi:'الجملة الفعلية',alif:'الألف المقصورة والياء',tanw:'التنوين',rule:'القواعد',read:'قصة: في حديقة الحي'};
+
+/* ================= save ================= */
+let save={car:0,colors:{},name:'',mastery:{},wins:0,races:0,sound:true,music:true};
+try{const s=localStorage.getItem('sibaq-v1');if(s)save=Object.assign(save,JSON.parse(s));}catch(e){}
+function persist(){try{localStorage.setItem('sibaq-v1',JSON.stringify(save));}catch(e){}}
+const mastered=()=>QS.filter(q=>(save.mastery[q.id]||0)>0).length;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= audio ================= */
+let AC=null,vsrc=null,vtoken=0;const bufs={};
+function audioInit(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();}catch(e){}}
+function decode(buf){return new Promise((res,rej)=>{try{const p=AC.decodeAudioData(buf,res,rej);if(p&&p.then)p.then(res,rej);}catch(e){rej(e);}});}
+function getBuf(url){if(!bufs[url])bufs[url]=fetch(url).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer();}).then(decode).catch(e=>{delete bufs[url];throw e;});return bufs[url];}
+const vurl=id=>'v-'+id+'.mp3';
+function stopVoice(){vtoken++;if(vsrc){try{vsrc.stop();}catch(e){}vsrc=null;}duck(false);}
+async function say(id){if(!id||!AC||!save.sound)return;const my=++vtoken;if(vsrc){try{vsrc.stop();}catch(e){}vsrc=null;}let b;try{b=await getBuf(vurl(id));}catch(e){return;}if(my!==vtoken)return;
+  const s=AC.createBufferSource();s.buffer=b;const g=AC.createGain();g.gain.value=1.2;s.connect(g);g.connect(AC.destination);vsrc=s;duck(true);s.start();
+  return new Promise(r=>{s.onended=()=>{if(vsrc===s){vsrc=null;duck(false);}r();};});}
+function prefetch(ids){if(AC)ids.forEach(i=>getBuf(vurl(i)).catch(()=>{}));}
+async function sfx(name,vol,rate){if(!AC||!save.sound)return;try{const b=await getBuf('snd-'+name+'.mp3');const s=AC.createBufferSource();s.buffer=b;if(rate)s.playbackRate.value=rate;const g=AC.createGain();g.gain.value=vol||0.6;s.connect(g);g.connect(AC.destination);s.start();return s;}catch(e){}}
+function beep(f,d,vol,type){if(!AC||!save.sound)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||0.18,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+0.05);}
+function tap(){beep(880,0.07,0.15);}
+let engine=null,musicNode=null;
+async function engineStart(){if(!AC||!save.sound||engine)return;try{const b=await getBuf('snd-engine.mp3');const s=AC.createBufferSource();s.buffer=b;s.loop=true;s.loopStart=0.08;s.loopEnd=b.duration-0.08;const g=AC.createGain();g.gain.value=0.0;s.connect(g);g.connect(AC.destination);s.start(0,0.1);engine={s,g};}catch(e){}}
+function engineStop(){if(engine){try{engine.s.stop();}catch(e){}engine=null;}}
+async function musicStart(){if(!AC||!save.sound||!save.music||musicNode)return;try{const b=await getBuf('snd-music.mp3');const s=AC.createBufferSource();s.buffer=b;s.loop=true;const g=AC.createGain();g.gain.value=0.1;s.connect(g);g.connect(AC.destination);s.start();musicNode={s,g};}catch(e){}}
+function musicStop(){if(musicNode){try{musicNode.s.stop();}catch(e){}musicNode=null;}}
+function duck(on){if(musicNode&&AC)musicNode.g.gain.setTargetAtTime(on?0.03:0.1,AC.currentTime,0.15);if(engine&&AC)engine.g.gain.setTargetAtTime(on?0.06:engine.g.gain.value,AC.currentTime,0.1);}
+function vib(ms){try{if(navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
+
+/* ================= helpers ================= */
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const frame=()=>new Promise(r=>requestAnimationFrame(()=>r()));
+const lerp=(a,b,k)=>a+(b-a)*k;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const strip=w=>w.replace(/[ً-ْٰ]/g,'');
+function el(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!==undefined)e.innerHTML=html;return e;}
+function toast(t,color){const d=el('div','toast',t);if(color)d.style.color=color;document.body.appendChild(d);setTimeout(()=>d.remove(),1300);}
+function updStars(bump){document.querySelectorAll('.starsN').forEach(e=>e.textContent=mastered()+'/'+QS.length);$('#winsN').textContent=save.wins||0;if(bump){const p=$('#starPill');p.classList.remove('bump');void p.offsetWidth;p.classList.add('bump');}}
+const recentQ=[];
+function pickQ(filter){let list=QS.filter(q=>filter(q)&&!recentQ.includes(q.id));if(!list.length)list=QS.filter(filter);
+  const minM=Math.min(...list.map(q=>save.mastery[q.id]||0));const low=list.filter(q=>(save.mastery[q.id]||0)===minM);const q=rnd(low);recentQ.push(q.id);if(recentQ.length>12)recentQ.shift();return q;}
+function stemHTML(q,filled){return q.q+(filled?'<span class="fill">'+q.answer+'</span>':'<span class="blank"></span>');}
+function texCanvas(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),c);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;}
+
+/* ================= three ================= */
+const renderer=new THREE.WebGLRenderer({antialias:(devicePixelRatio||1)<2,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+$('#gl').appendChild(renderer.domElement);
+const pmrem=new THREE.PMREMGenerator(renderer);const envTex=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,900);
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();});
+const gltfLoader=new GLTFLoader();
+const texLoader=new THREE.TextureLoader();
+function b64buf(b64){const bin=atob(b64.trim());const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
+const glbCache={};
+function loadGLB(path){return glbCache[path]||(glbCache[path]=fetch(path).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status+' '+path);return r.text();}).then(b64=>new Promise((res,rej)=>gltfLoader.parse(b64buf(b64),'',res,rej))));}
+function tex(path,rep){const t=texLoader.load(path);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;if(rep)t.repeat.set(rep[0],rep[1]);t.anisotropy=8;return t;}
+
+/* ================= cars ================= */
+const CARS=[
+ {id:'sport',name:'السيارة الرياضية',file:'m-sport.txt',flip:true,len:4.5,paint:'body',colors:['#E8202A','#FFC400','#1E88FF','#FFFFFF','#19C37D','#FF6FB5'],def:'#E8202A'},
+ {id:'f1',name:'سيارة الفورمولا',file:'m-car_f1.txt',flip:false,len:5.0,paint:'paint',colors:['#FF2A12','#1E88FF','#FFC400','#19C37D','#9B5CFF','#FF6FB5'],def:'#FF2A12'},
+ {id:'suv',name:'الجيب',file:'m-car_suv.txt',flip:false,len:4.7,paint:'paint',colors:['#F2F4F7','#111317','#1E5BFF','#C1121F','#E3B341','#2A9D8F'],def:'#F2F4F7'},
+ {id:'sedan',name:'السيدان',file:'m-car_sedan.txt',flip:false,len:4.6,paint:null,colors:[],def:null},
+];
+function paintMat(hex){return new THREE.MeshPhysicalMaterial({color:new THREE.Color(hex),metalness:0.55,roughness:0.28,clearcoat:1,clearcoatRoughness:0.05,envMapIntensity:1.2});}
+async function makeCar(ci,colorHex){const C=CARS[ci];const g=await loadGLB(C.file);const root=g.scene.clone(true);
+  const wheels=[];
+  root.traverse(o=>{if(!o.isMesh)return;o.material=o.material.clone();o.material.envMap=envTex;o.material.envMapIntensity=1;
+    const nm=(o.material.name||'')+' '+(o.name||'');
+    if(C.paint&&colorHex&&(nm.includes(C.paint)))o.material=paintMat(colorHex);
+    if(C.id==='sport'){if(o.name==='glass'){o.material=new THREE.MeshPhysicalMaterial({color:0x111111,metalness:0.2,roughness:0,transmission:0,transparent:true,opacity:0.55,envMap:envTex});}
+      if(/^rim_|trim/.test(o.name))o.material=new THREE.MeshStandardMaterial({color:0xdddddd,metalness:1,roughness:0.25,envMap:envTex});}
+    if(/^wheel_/.test(o.name))wheels.push(o);});
+  root.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(root);const s=b.getSize(new THREE.Vector3());const len=Math.max(s.x,s.z);const k=C.len/len;root.scale.multiplyScalar(k);root.updateMatrixWorld(true);b.setFromObject(root);
+  const c=b.getCenter(new THREE.Vector3());root.position.x-=c.x;root.position.z-=c.z;root.position.y-=b.min.y;
+  const inner=new THREE.Group();inner.add(root);if(C.flip)inner.rotation.y=Math.PI;
+  const grp=new THREE.Group();grp.add(inner);
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(2.4,C.len*1.05),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false,opacity:0.8}));sh.rotation.x=-Math.PI/2;sh.position.y=0.03;sh.renderOrder=1;grp.add(sh);
+  grp.userData={wheels,inner,ci};return grp;}
+const shadowTex=texCanvas(64,128,(g)=>{const gr=g.createRadialGradient(32,64,6,32,64,60);gr.addColorStop(0,'rgba(0,0,0,.55)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,64,128);});
+
+/* ================= garage scene ================= */
+const gScene=new THREE.Scene();gScene.background=new THREE.Color(0xDDF0FF);gScene.environment=envTex;
+gScene.add(new THREE.HemisphereLight(0xffffff,0xa8c8e8,1.2));{const d=new THREE.DirectionalLight(0xffffff,2.2);d.position.set(4,8,6);gScene.add(d);}
+const floor=new THREE.Mesh(new THREE.CircleGeometry(30,64),new THREE.MeshStandardMaterial({color:0xF2F7FF,roughness:0.9}));floor.rotation.x=-Math.PI/2;gScene.add(floor);
+const turn=new THREE.Mesh(new THREE.CylinderGeometry(3.6,3.8,0.25,64),new THREE.MeshStandardMaterial({color:0xFFD23F,roughness:0.5}));turn.position.y=0.12;gScene.add(turn);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(3.7,0.08,8,64),new THREE.MeshStandardMaterial({color:0x2B2A33}));ring.rotation.x=Math.PI/2;ring.position.y=0.26;gScene.add(ring);
+for(let i=0;i<14;i++){const h=3+Math.random()*7;const m=new THREE.Mesh(new THREE.BoxGeometry(2.5,h,2.5),new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(Math.random(),0.6,0.78)}));const a=i/14*Math.PI*2;m.position.set(Math.cos(a)*16,h/2,Math.sin(a)*16-4);gScene.add(m);}
+let gCar=null,gCarIdx=-1,gSpin=0;
+async function showGarageCar(){const ci=save.car;const col=save.colors[CARS[ci].id]||CARS[ci].def;const token=Symbol();showGarageCar.t=token;const car=await makeCar(ci,col);if(showGarageCar.t!==token)return;if(gCar)gScene.remove(gCar);gCar=car;car.position.y=0.25;gScene.add(car);gCarIdx=ci;
+  $('#carName').textContent=CARS[ci].name;const sw=$('#swatches');sw.innerHTML='';
+  if(!CARS[ci].colors.length)sw.appendChild(el('span','pill','🎨 لون أصلي'));
+  CARS[ci].colors.forEach(c=>{const b=el('button','sw'+(c===col?' sel':''));b.style.background=c;b.setAttribute('aria-label','لون');b.onclick=()=>{tap();save.colors[CARS[ci].id]=c;persist();recolor(gCar,ci,c);sw.querySelectorAll('.sw').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');};sw.appendChild(b);});}
+function recolor(car,ci,hex){const C=CARS[ci];if(!C.paint)return;car.traverse(o=>{if(o.isMesh&&o.material&&o.material.isMeshPhysicalMaterial&&o.material.clearcoat===1)o.material.color.set(hex);});}
+$('#carPrev').onclick=()=>{tap();save.car=(save.car+CARS.length-1)%CARS.length;persist();showGarageCar();};
+$('#carNext').onclick=()=>{tap();save.car=(save.car+1)%CARS.length;persist();showGarageCar();};
+
+/* ================= race scene ================= */
+const rScene=new THREE.Scene();rScene.environment=envTex;
+rScene.background=new THREE.Color(0xBFE3FF);rScene.fog=new THREE.Fog(0xCFEAFF,140,520);
+rScene.add(new THREE.HemisphereLight(0xffffff,0xb7c9a8,1.15));{const d=new THREE.DirectionalLight(0xfff4e0,2.0);d.position.set(120,200,80);rScene.add(d);}
+const ROAD_W=16,LANE_W=ROAD_W/3,SIDE_W=5.5;
+const TRACK=[[0,0],[150,-20],[270,30],[320,150],[260,270],[130,300],[40,230],[-70,270],[-190,230],[-240,110],[-180,10],[-90,-30]];
+const curve=new THREE.CatmullRomCurve3(TRACK.map(([x,z])=>new THREE.Vector3(x,0,z)),true,'centripetal');
+const L=curve.getLength();const NS=Math.ceil(L/2);const SP=curve.getSpacedPoints(NS);
+const PX=new Float32Array(NS),PZ=new Float32Array(NS),TX=new Float32Array(NS),TZ=new Float32Array(NS);
+for(let i=0;i<NS;i++){PX[i]=SP[i].x;PZ[i]=SP[i].z;const n=SP[(i+1)%NS];let tx=n.x-SP[i].x,tz=n.z-SP[i].z;const l=Math.hypot(tx,tz)||1;TX[i]=tx/l;TZ[i]=tz/l;}
+const DS=L/NS;
+function trackAt(s){s=((s%L)+L)%L;const f=s/DS;const i=Math.floor(f)%NS,j=(i+1)%NS,k=f-Math.floor(f);
+  const px=lerp(PX[i],PX[j],k),pz=lerp(PZ[i],PZ[j],k);let tx=lerp(TX[i],TX[j],k),tz=lerp(TZ[i],TZ[j],k);const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;return {px,pz,tx,tz,rx:-tz,rz:tx};}
+function posAt(s,x){const t=trackAt(s);return {x:t.px+t.rx*x,z:t.pz+t.rz*x,yaw:Math.atan2(t.tx,t.tz),t};}
+let raceBuilt=false;const raceStatic=new THREE.Group();rScene.add(raceStatic);
+function ribbon(off0,off1,y,vScale,mat,yOuter){const pos=[],uv=[],idx=[];for(let i=0;i<=NS;i++){const k=i%NS;const rx=-TZ[k],rz=TX[k];const v=i*DS/vScale;
+    pos.push(PX[k]+rx*off0,y,PZ[k]+rz*off0, PX[k]+rx*off1,(yOuter??y),PZ[k]+rz*off1);uv.push(0,v,1,v);if(i<NS){const a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,mat);raceStatic.add(m);return m;}
+function roadTexture(){const img=new Image();const c=document.createElement('canvas');c.width=512;c.height=512;const g=c.getContext('2d');const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;
+  const paint=()=>{g.fillStyle='#55585E';g.fillRect(0,0,512,512);if(img.complete&&img.naturalWidth){g.globalAlpha=0.9;g.drawImage(img,0,0,512,512);g.globalAlpha=1;}
+    g.fillStyle='rgba(255,255,255,.08)';g.fillRect(0,0,512,512);
+    g.fillStyle='#FFFFFF';g.fillRect(14,0,10,512);g.fillRect(488,0,10,512);
+    for(const x of [512/3,1024/3]){for(let y=0;y<512;y+=128)g.fillRect(x-5,y,10,70);}
+    t.needsUpdate=true;};
+  img.onload=paint;img.src='tex-asphalt.jpg';paint();return t;}
+function curbTexture(){return texCanvas(64,128,(g)=>{for(let i=0;i<4;i++){g.fillStyle=i%2?'#FFFFFF':'#E8202A';g.fillRect(0,i*32,64,32);}});}
+function windowTexture(){return texCanvas(128,256,(g)=>{g.fillStyle='#FFFFFF';g.fillRect(0,0,128,256);for(let y=10;y<250;y+=26)for(let x=10;x<120;x+=28){g.fillStyle='#7FB8E8';g.fillRect(x,y,18,16);g.fillStyle='rgba(255,255,255,.6)';g.fillRect(x,y,6,16);}
+  g.fillStyle='#E6E1D6';g.fillRect(0,0,128,4);});}
+function signTexture(lines,bg,ink){return texCanvas(512,256,(g)=>{g.fillStyle=bg||'#FFFBEF';g.strokeStyle=ink||'#2B2A33';g.lineWidth=14;const r=34;g.beginPath();g.moveTo(r,7);g.lineTo(505-r,7);g.quadraticCurveTo(505,7,505,7+r);g.lineTo(505,249-r);g.quadraticCurveTo(505,249,505-r,249);g.lineTo(r,249);g.quadraticCurveTo(7,249,7,249-r);g.lineTo(7,7+r);g.quadraticCurveTo(7,7,r,7);g.closePath();g.fill();g.stroke();
+  g.fillStyle=ink||'#2B2A33';g.textAlign='center';g.textBaseline='middle';g.direction='rtl';const arr=Array.isArray(lines)?lines:[lines];
+  let size=arr.length>1?72:120;const font=s=>'bold '+s+'px "Noto Naskh Arabic","Baloo Bhaijaan 2",serif';g.font=font(size);while(arr.some(l=>g.measureText(l).width>460)&&size>34){size-=4;g.font=font(size);}
+  arr.forEach((l,i)=>g.fillText(l,256,128+(i-(arr.length-1)/2)*size*1.15+6));});}
+function wrapText(t){t=String(t);if(strip(t).length<=14)return [t];const w=t.split(' ');if(w.length<2)return [t];let best=[t],bd=1e9;for(let i=1;i<w.length;i++){const a=w.slice(0,i).join(' '),b=w.slice(i).join(' ');const d=Math.abs(strip(a).length-strip(b).length);if(d<bd){bd=d;best=[a,b];}}return best;}
+function qatarFlagTex(){return texCanvas(256,100,(g)=>{g.fillStyle='#8A1538';g.fillRect(0,0,256,100);g.fillStyle='#FFFFFF';g.beginPath();g.moveTo(0,0);g.lineTo(72,0);const n=9,hh=100/n;for(let i=0;i<n;i++){g.lineTo(100,hh*i+hh/2);g.lineTo(72,hh*(i+1));}g.lineTo(0,100);g.closePath();g.fill();});}
+const flags=[];
+function flagPole(x,z,h){const grp=new THREE.Group();const p=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,h,8),new THREE.MeshStandardMaterial({color:0xEEEEEE,metalness:0.6,roughness:0.3}));p.position.y=h/2;grp.add(p);
+  const geo=new THREE.PlaneGeometry(3,1.2,12,3);const f=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({map:qatarFlagTex(),side:THREE.DoubleSide}));f.position.set(1.55,h-0.7,0);f.userData.base=geo.attributes.position.array.slice();grp.add(f);flags.push(f);grp.position.set(x,0,z);raceStatic.add(grp);return grp;}
+async function buildRace(prog){
+  if(raceBuilt)return;
+  // sky dome
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(800,24,12),new THREE.MeshBasicMaterial({side:THREE.BackSide,fog:false,map:texCanvas(4,256,(g)=>{const gr=g.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#7EC4FF');gr.addColorStop(0.5,'#CBE8FF');gr.addColorStop(1,'#F4FBFF');g.fillStyle=gr;g.fillRect(0,0,4,256);})}));rScene.add(sky);
+  const sun=new THREE.Mesh(new THREE.CircleGeometry(30,32),new THREE.MeshBasicMaterial({color:0xFFF3B0,fog:false}));sun.position.set(-300,260,-500);sun.lookAt(0,0,0);rScene.add(sun);
+  // ground
+  const gtex=tex('tex-pavement2.jpg',[220,220]);const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshLambertMaterial({map:gtex,color:0xE9EDE4}));ground.rotation.x=-Math.PI/2;ground.position.set(40,-0.02,135);raceStatic.add(ground);
+  const grassM=new THREE.MeshLambertMaterial({color:0x8ED36B});
+  // road + curbs + sidewalks
+  ribbon(-ROAD_W/2,ROAD_W/2,0.02,12,new THREE.MeshStandardMaterial({map:roadTexture(),roughness:0.85,metalness:0}));
+  const curbM=new THREE.MeshLambertMaterial({map:curbTexture()});
+  ribbon(-ROAD_W/2-0.9,-ROAD_W/2,0.12,4,curbM,0.04);ribbon(ROAD_W/2,ROAD_W/2+0.9,0.04,4,curbM,0.12);
+  const swM=new THREE.MeshLambertMaterial({map:tex('tex-sidewalk.jpg'),color:0xF4F0E8});
+  ribbon(-ROAD_W/2-0.9-SIDE_W,-ROAD_W/2-0.9,0.14,SIDE_W,swM);ribbon(ROAD_W/2+0.9,ROAD_W/2+0.9+SIDE_W,0.14,SIDE_W,swM);
+  prog(0.35);await frame();
+  // start/finish line + gantry
+  {const p=posAt(0,0);const ch=texCanvas(256,64,(g)=>{for(let x=0;x<16;x++)for(let y=0;y<4;y++){g.fillStyle=(x+y)%2?'#111':'#fff';g.fillRect(x*16,y*16,16,16);}});
+   const line=new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W,3),new THREE.MeshLambertMaterial({map:ch}));line.rotation.x=-Math.PI/2;line.rotation.z=-p.yaw;line.position.set(p.x,0.05,p.z);line.rotation.order='YXZ';line.rotation.set(-Math.PI/2,0,0);const holder=new THREE.Group();holder.add(line);holder.position.set(p.x,0.05,p.z);line.position.set(0,0,0);holder.rotation.y=p.yaw;raceStatic.add(holder);
+   gantry(0,['🏁 خط البداية والنهاية'],'#FFD23F');
+   const l=posAt(-12,-ROAD_W/2-3),r=posAt(-12,ROAD_W/2+3);flagPole(l.x,l.z,8);flagPole(r.x,r.z,8);const l2=posAt(30,-ROAD_W/2-3),r2=posAt(30,ROAD_W/2+3);flagPole(l2.x,l2.z,8);flagPole(r2.x,r2.z,8);}
+  // occupancy grid for road
+  const cell=20,occ=new Map();for(let i=0;i<NS;i++){const k=Math.floor(PX[i]/cell)+','+Math.floor(PZ[i]/cell);(occ.get(k)||occ.set(k,[]).get(k)).push(i);}
+  const nearRoad=(x,z,r)=>{const cx=Math.floor(x/cell),cz=Math.floor(z/cell);for(let a=-2;a<=2;a++)for(let b=-2;b<=2;b++){const arr=occ.get((cx+a)+','+(cz+b));if(!arr)continue;for(const i of arr){if(Math.hypot(PX[i]-x,PZ[i]-z)<r)return true;}}return false;};
+  // park «حديقة الحي» around s≈0.62L on the right side
+  const PARK_S=L*0.62;const placed=[];
+  try{const pk=await loadGLB('m-park.txt');for(let k=-2;k<=2;k++){const p=posAt(PARK_S+k*8.5,ROAD_W/2+0.9+SIDE_W+4);const m=pk.scene.clone(true);m.scale.setScalar(1.05);m.position.set(p.x,0.1,p.z);m.rotation.y=p.yaw+Math.PI/2;raceStatic.add(m);placed.push([p.x,p.z,7]);}
+    const gp=posAt(PARK_S,ROAD_W/2+0.9+SIDE_W+16);const grass=new THREE.Mesh(new THREE.PlaneGeometry(56,30),grassM);grass.rotation.x=-Math.PI/2;grass.rotation.z=-gp.yaw;grass.position.set(gp.x,0.06,gp.z);
+    const gh=new THREE.Group();gh.position.set(gp.x,0.06,gp.z);gh.rotation.y=gp.yaw;grass.position.set(0,0,0);grass.rotation.set(-Math.PI/2,0,Math.PI/2);gh.add(grass);raceStatic.add(gh);placed.push([gp.x,gp.z,26]);
+    const sp=posAt(PARK_S-30,ROAD_W/2+3);const sign=new THREE.Mesh(new THREE.PlaneGeometry(6,3),new THREE.MeshBasicMaterial({map:signTexture(['🌳 حديقة الحي'],'#E2F8E9'),side:THREE.DoubleSide}));sign.position.set(sp.x,4.2,sp.z);sign.rotation.y=sp.yaw+Math.PI;raceStatic.add(sign);
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,3,8),new THREE.MeshLambertMaterial({color:0x555555}));post.position.set(sp.x,1.5,sp.z);raceStatic.add(post);}catch(e){console.warn(e);}
+  prog(0.5);await frame();
+  // buildings (instanced) along both sides
+  const bGeo=new THREE.BoxGeometry(1,1,1);bGeo.translate(0,0.5,0);
+  const winTex=windowTexture();winTex.wrapS=winTex.wrapT=THREE.RepeatWrapping;
+  const bMat=new THREE.MeshLambertMaterial({map:winTex});
+  const B=[];const PAL=['#FFE8C2','#FFD1DC','#CDEBFF','#D7F5D0','#E6DAFF','#FFF2A8','#FFD8B0','#C8F2EE','#F4F4F4'];
+  for(let s=0;s<L;s+=13){for(const side of [-1,1]){if(Math.abs(((s-PARK_S+L)%L))<45||Math.abs(((PARK_S-s+L)%L))<45)if(side===1)continue;if(s<40||s>L-30)continue;
+      const w=8+Math.random()*8,d=8+Math.random()*7,h=8+Math.random()*30;const off=(ROAD_W/2+0.9+SIDE_W+2+d/2+Math.random()*4)*side;const p=posAt(s,off);
+      if(nearRoad(p.x,p.z,ROAD_W/2+0.9+SIDE_W+Math.max(w,d)*0.55))continue;if(placed.some(([x,z,r])=>Math.hypot(x-p.x,z-p.z)<r+Math.max(w,d)*0.6))continue;
+      placed.push([p.x,p.z,Math.max(w,d)*0.55]);B.push({x:p.x,z:p.z,w,d,h,yaw:p.yaw,c:rnd(PAL)});}}
+  // outer ring of tall towers (skyline)
+  for(let i=0;i<46;i++){const a=i/46*Math.PI*2,R=470+Math.random()*60;const x=40+Math.cos(a)*R,z=135+Math.sin(a)*R;const h=40+Math.random()*90;B.push({x,z,w:20+Math.random()*16,d:20+Math.random()*16,h,yaw:a,c:rnd(PAL)});}
+  const inst=new THREE.InstancedMesh(bGeo,bMat,B.length);const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),S=new THREE.Vector3(),P=new THREE.Vector3(),C=new THREE.Color();
+  B.forEach((b,i)=>{Q.setFromAxisAngle(new THREE.Vector3(0,1,0),b.yaw);M.compose(P.set(b.x,0,b.z),Q,S.set(b.w,b.h,b.d));inst.setMatrixAt(i,M);inst.setColorAt(i,C.set(b.c));});
+  inst.instanceMatrix.needsUpdate=true;if(inst.instanceColor)inst.instanceColor.needsUpdate=true;raceStatic.add(inst);
+  // roofs (darker caps)
+  const roof=new THREE.InstancedMesh(bGeo,new THREE.MeshLambertMaterial({color:0xD9D4CA}),B.length);B.forEach((b,i)=>{Q.setFromAxisAngle(new THREE.Vector3(0,1,0),b.yaw);M.compose(P.set(b.x,b.h,b.z),Q,S.set(b.w*1.04,0.6,b.d*1.04));roof.setMatrixAt(i,M);});raceStatic.add(roof);
+  prog(0.65);await frame();
+  // trees + lamps along sidewalks
+  const trunkG=new THREE.CylinderGeometry(0.18,0.25,2.4,6);trunkG.translate(0,1.2,0);const crownG=new THREE.IcosahedronGeometry(1.6,0);crownG.translate(0,3.6,0);
+  const palmLeaf=new THREE.ConeGeometry(1.9,1.2,7);palmLeaf.translate(0,4.4,0);
+  const T=[];for(let s=6;s<L;s+=24){for(const side of [-1,1]){const p=posAt(s+(side>0?12:0),(ROAD_W/2+0.9+SIDE_W-1.4)*side);T.push(p);}}
+  const trunk=new THREE.InstancedMesh(trunkG,new THREE.MeshLambertMaterial({color:0x8B5A2B}),T.length);const crown=new THREE.InstancedMesh(crownG,new THREE.MeshLambertMaterial({color:0x4CB944,flatShading:true}),T.length);
+  T.forEach((p,i)=>{M.compose(P.set(p.x,0.14,p.z),Q.identity(),S.set(1,0.9+Math.random()*0.4,1));trunk.setMatrixAt(i,M);crown.setMatrixAt(i,M);crown.setColorAt(i,C.setHSL(0.27+Math.random()*0.08,0.55,0.42+Math.random()*0.1));});raceStatic.add(trunk,crown);
+  const poleG=new THREE.CylinderGeometry(0.09,0.12,6.5,6);poleG.translate(0,3.25,0);const lampG=new THREE.BoxGeometry(1.4,0.25,0.5);lampG.translate(-0.5,6.4,0);
+  const LP=[];for(let s=18;s<L;s+=36){for(const side of [-1,1]){const p=posAt(s,(ROAD_W/2+1.4)*side);LP.push([p,side]);}}
+  const poles=new THREE.InstancedMesh(poleG,new THREE.MeshStandardMaterial({color:0x3A3D45,metalness:0.6,roughness:0.4}),LP.length);const lamps=new THREE.InstancedMesh(lampG,new THREE.MeshBasicMaterial({color:0xFFF6C8}),LP.length);
+  LP.forEach(([p,side],i)=>{Q.setFromAxisAngle(new THREE.Vector3(0,1,0),p.yaw+(side>0?0:Math.PI)+Math.PI/2*0);M.compose(P.set(p.x,0.14,p.z),Q.setFromAxisAngle(new THREE.Vector3(0,1,0),p.yaw+(side>0?Math.PI/2:-Math.PI/2)),S.set(1,1,1));poles.setMatrixAt(i,M);lamps.setMatrixAt(i,M);});raceStatic.add(poles,lamps);
+  prog(0.8);await frame();
+  try{barrierAsset=await loadGLB('m-barrier.txt');}catch(e){console.warn(e);}
+  raceBuilt=true;}
+function gantry(s,lines,bg){const p=posAt(s,0);const grp=new THREE.Group();const m=new THREE.MeshStandardMaterial({color:0x2B2A33,metalness:0.5,roughness:0.4});
+  for(const x of [-ROAD_W/2-1.2,ROAD_W/2+1.2]){const pole=new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);pole.position.set(x,4,0);grp.add(pole);}
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(ROAD_W+3,0.7,0.6),m);beam.position.y=7.8;grp.add(beam);
+  if(lines){const sg=new THREE.Mesh(new THREE.PlaneGeometry(10,2.2),new THREE.MeshBasicMaterial({map:signTexture(lines,bg),side:THREE.DoubleSide}));sg.position.set(0,9.3,0);sg.rotation.y=Math.PI;grp.add(sg);}
+  grp.position.set(p.x,0,p.z);grp.rotation.y=p.yaw;raceStatic.add(grp);return grp;}
+let barrierAsset=null;
+
+/* ================= race state ================= */
+const LAPS=2;
+let player=null,ais=[],gates=[],racing=false,raceT=0,phase='menu',finishOrder=[],steer=0,steerKeys={l:false,r:false},autoTarget=null,camS=0;
+const GATE_FR=[0.13,0.33,0.5,0.74,0.9];
+const ZONE=140;
+function mkGateObjects(g){const grp=new THREE.Group();const p=posAt(g.s,0);grp.position.set(p.x,0,p.z);grp.rotation.y=p.yaw;
+  if(g.type==='lane'){const m=new THREE.MeshStandardMaterial({color:0x2B2A33,metalness:0.5,roughness:0.4});
+    for(const x of [-ROAD_W/2-1.2,ROAD_W/2+1.2]){const pole=new THREE.Mesh(new THREE.BoxGeometry(0.5,7.6,0.5),m);pole.position.set(x,3.8,0);grp.add(pole);}
+    const beam=new THREE.Mesh(new THREE.BoxGeometry(ROAD_W+3,0.6,0.5),m);beam.position.y=7.4;grp.add(beam);
+    const cones=new THREE.Group();grp.add(cones);g.cones=cones;}
+  else{const bars=new THREE.Group();grp.add(bars);g.bars=bars;
+    for(let i=0;i<3;i++){let b;if(barrierAsset){b=barrierAsset.scene.clone(true);b.scale.set(2.6,1.3,1.4);}else{b=new THREE.Mesh(new THREE.BoxGeometry(4.4,1.6,1),new THREE.MeshLambertMaterial({color:0xE8E2D8}));b.position.y=0.8;}
+      const h=new THREE.Group();h.add(b);h.position.set((i-1)*LANE_W,0,0);bars.add(h);}
+    const stripe=new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W,0.5),new THREE.MeshBasicMaterial({map:curbTexture(),side:THREE.DoubleSide}));stripe.position.set(0,1.85,-0.75);stripe.rotation.y=Math.PI;stripe.material.map.repeat.set(1,1);bars.add(stripe);
+    const sg=new THREE.Mesh(new THREE.PlaneGeometry(7,2.4),new THREE.MeshBasicMaterial({map:signTexture(['؟ محطة سؤال'],'#FFD23F'),side:THREE.DoubleSide}));sg.position.set(0,3.8,0);sg.rotation.y=Math.PI;bars.add(sg);
+    bars.position.y=-6;bars.visible=false;}
+  rScene.add(grp);g.grp=grp;}
+function setLaneSigns(g){if(g.signs)g.signs.forEach(s=>g.grp.remove(s));g.signs=[];const n=g.opts.length;const cols=['#FFD23F','#5CE1E6','#FF9EC7'];
+  g.opts.forEach((o,i)=>{const x=laneX(i,n);const big=g.q.cat==='alif';const sg=new THREE.Mesh(new THREE.PlaneGeometry(n===2?6.8:4.9,2.6),new THREE.MeshBasicMaterial({map:signTexture(big?[o]:wrapText(o),cols[i]),side:THREE.DoubleSide}));
+    sg.position.set(-x,5.6,0);sg.rotation.y=Math.PI;g.grp.add(sg);g.signs.push(sg);});
+  // lane divider cones
+  while(g.cones.children.length)g.cones.remove(g.cones.children[0]);const coneG=new THREE.ConeGeometry(0.35,0.9,10);coneG.translate(0,0.45,0);const coneM=new THREE.MeshLambertMaterial({color:0xFF7A1A});
+  for(let k=1;k<n;k++){const x=-ROAD_W/2+k*ROAD_W/n;for(let z=0;z<4;z++){const c=new THREE.Mesh(coneG,coneM);c.position.set(-x,0,-z*2.2-1);g.cones.add(c);}}}
+function laneX(i,n){return n===2?(i===0?-ROAD_W/4:ROAD_W/4):(i-1)*LANE_W;}
+// NOTE: in the gate group the camera looks along +z of the track; lane 0 is the screen-left lane (x<0 in track-right coordinates means left)
+function laneOf(x,n){if(n===2)return x<0?0:1;return x<-LANE_W/2?0:(x>LANE_W/2?2:1);}
+
+async function startRace(){
+  phase='loading';$('#garage').hidden=true;showLoading('جاري بناء المدينة… 🏙️');
+  await buildRace(p=>setLoad(0.1+p*0.7));
+  // clear old
+  if(player)rScene.remove(player.obj);ais.forEach(a=>rScene.remove(a.obj));gates.forEach(g=>rScene.remove(g.grp));
+  const ci=save.car;const pcar=await makeCar(ci,save.colors[CARS[ci].id]||CARS[ci].def);rScene.add(pcar);
+  player={obj:pcar,s:-8,x:LANE_W*0.5,v:0,lap:0,prog:0,boost:0,spin:0,wob:0,bumpT:0,done:false,ci};
+  setLoad(0.88);
+  const others=[0,1,2,3].filter(i=>i!==ci);ais=[];
+  const names=['سعود','مريم','فهد','حمد','نورة','جاسم'];shuffle(names);
+  for(let k=0;k<3;k++){const ai=others[k%others.length];const C=CARS[ai];const col=C.colors.length?rnd(C.colors):null;const o=await makeCar(ai,col);rScene.add(o);
+    const lane=[-1,0,1][k];ais.push({obj:o,s:-8-(k+1)*9,x:lane*LANE_W,tx:lane*LANE_W,v:0,base:23.6+Math.random()*1.8,lap:0,prog:0,done:false,name:names[k],laneT:3+Math.random()*4,stopT:0});}
+  gates=[];for(let lap=0;lap<LAPS;lap++)GATE_FR.forEach((f,i)=>{gates.push({lap,s:f*L,type:i===3?'stop':'lane',state:'idle'});});
+  gates.forEach(mkGateObjects);
+  setLoad(1);await sleep(150);hideLoading();
+  finishOrder=[];raceT=0;retryQ=null;laneCount=0;camS=player.s-12;
+  ['#hud','#mini','#speedo','#padL','#padR','#horn'].forEach(s=>$(s).hidden=false);updStars();
+  phase='count';updHud();
+  prefetch(['ev_go','ev_lane','ev_stop','ev_boost','fb_ok1','fb_ok2','fb_ok3','fb_ok4','fb_no1','fb_no2','ev_finish','ev_first']);
+  engineStart();musicStart();
+  const cd=el('div','count');document.body.appendChild(cd);sfx('countdown',0.7);say('ev_go');
+  for(const n of ['٣','٢','١']){cd.innerHTML='<span>'+n+'</span>';await sleep(800);}
+  cd.innerHTML='<span style="color:#7BE0A5">انطلق!</span>';phase='race';racing=true;await sleep(700);cd.remove();}
+function showLoading(m){$('#loading').hidden=false;$('#loadMsg').textContent=m;setLoad(0.05);}
+function setLoad(p){$('#loadBar').style.width=Math.round(p*100)+'%';}
+function hideLoading(){$('#loading').hidden=true;}
+function updHud(){if(!player)return;$('#lapN').textContent=Math.min(LAPS,player.lap+1)+'/'+LAPS;const pos=placeOf();$('#posN').textContent=pos+'/4';$('#posPill').firstChild.textContent=['🥇','🥈','🥉','🏎️'][pos-1]+' ';}
+function progOf(c){return c.lap*L+c.s;}
+function placeOf(){const me=progOf(player);if(player.done)return finishOrder.indexOf('you')+1;let p=1;ais.forEach(a=>{if(a.done&&!player.done)p++;else if(!a.done&&progOf(a)>me)p++;});return Math.min(4,p);}
+
+/* ================= gates & questions ================= */
+let activeGate=null,retryQ=null,laneCount=0;
+function laneQ(){if(retryQ){const r=retryQ;retryQ=null;return r;}
+  const cats=['fi','alif','tanw','fi','tanw','alif','rule'];const cat=cats[Math.floor(Math.random()*cats.length)];
+  const q=pickQ(x=>x.cat===cat&&x.lane&&x.options.length<=3);return {q,opts:shuffle(q.options.slice()),retry:false};}
+function stopQ(){const q=pickQ(x=>x.cat==='read'||(!x.lane));return q;}
+function activateGate(g){activeGate=g;g.state='active';
+  if(g.type==='lane'){const r=laneQ();g.q=r.q;g.opts=r.opts;g.retry=r.retry;g.first=!r.retry;setLaneSigns(g);showPanel(g);
+    (async()=>{if((laneCount=(laneCount||0)+1)<=2)await say('ev_lane');if(activeGate===g&&g.state==='active')await say(g.q.say);})();}
+  else{g.q=stopQ();sfx('screech',0.35);showPanelStop();say('ev_stop');}}
+function showPanel(g){const p=$('#qpanel');p.innerHTML='';p.hidden=false;$('#mini').hidden=true;const q=g.q;const head=el('div','qhead');head.appendChild(el('span','tag',g.retry?'مرة ثانية 💪':'سؤال 🏁'));
+  const sb=el('button','icon say','🔊');sb.setAttribute('aria-label','اسمع');sb.onclick=()=>{tap();say(q.say);};head.appendChild(sb);p.appendChild(head);
+  const t=el('div','qt'+(q.cat==='alif'?' stem':''));if(q.cat==='alif')t.innerHTML=stemHTML(q,false);else t.textContent=q.q;p.appendChild(t);
+  const chips=el('div','chips');g.opts.forEach((o,i)=>{const c=el('button','chip c'+i+(q.cat==='alif'?' big':''),o);c.onclick=()=>{tap();autoTarget=laneX(i,g.opts.length);chips.querySelectorAll('.chip').forEach(x=>x.classList.remove('target'));c.classList.add('target');};chips.appendChild(c);});p.appendChild(chips);
+  p.appendChild(el('div','',' ')).style.cssText='font-size:13px;color:#6B6878;font-weight:800';p.lastChild.textContent='سُق إلى مسار الجواب الصحيح ⬅️ ➡️ (أو اضغط الجواب)';}
+function showPanelStop(){const p=$('#qpanel');p.innerHTML='';p.hidden=false;$('#mini').hidden=true;p.appendChild(el('div','qhead','<span class="tag" style="background:#E39B00">🚧 محطة سؤال</span>'));p.appendChild(el('div','qt','وقّف عند الحاجز وجاوب عشان ينفتح الطريق!'));}
+function hidePanel(){$('#qpanel').hidden=true;autoTarget=null;if(phase==='race')$('#mini').hidden=false;}
+function passLaneGate(g){const n=g.opts.length;const li=laneOf(player.x,n);const chosen=g.opts[li];const ok=chosen===g.q.answer;g.state='done';activeGate=null;
+  const chips=[...$('#qpanel').querySelectorAll('.chip')];chips.forEach((c,i)=>{if(g.opts[i]===g.q.answer)c.classList.add('right');else if(i===li)c.classList.add('wrong');});
+  if(g.q.cat==='alif'){const t=$('#qpanel .qt');if(t)t.innerHTML=stemHTML(g.q,true);}
+  g.signs.forEach((s,i)=>{s.material.color.set(g.opts[i]===g.q.answer?0x9CFFB8:(i===li?0xFF8A8A:0xBBBBBB));});
+  if(ok){const first=g.first;if(first){const b=save.mastery[g.q.id]||0;save.mastery[g.q.id]=b+1;persist();if(b===0){updStars(true);toast('⭐ +1');}}
+    player.boost=3.2;$('#boost').hidden=false;sfx('boost',0.6);vib(30);toast(rnd(['صح! 🔥','ممتاز! 🚀','بطل! ⭐']),'#7BE0A5');
+    (async()=>{await say(rnd(['fb_ok1','fb_ok2','fb_ok3','fb_ok4']));await say(g.q.explain);})();
+    setTimeout(()=>{if(!activeGate)hidePanel();},2600);}
+  else{player.spin=1.2;sfx('bump',0.8);setTimeout(()=>sfx('horn',0.5),150);vib([60,40,60]);toast('أووه! 😵','#FF8A8A');
+    // scatter cones of that lane
+    g.cones.children.forEach(c=>{c.userData.v=new THREE.Vector3((Math.random()-0.5)*6,4+Math.random()*3,4+Math.random()*4);});
+    const opts=g.opts.slice();let wrongs=opts.filter(o=>o!==g.q.answer);if(opts.length>2){const drop=chosen;opts.splice(opts.indexOf(drop),1);}
+    retryQ={q:g.q,opts:shuffle(opts),retry:true};
+    (async()=>{await say(rnd(['fb_no1','fb_no2']));await say(g.q.explain);})();
+    setTimeout(()=>{if(!activeGate)hidePanel();},3000);}}
+async function stopGateAsk(g){g.state='asking';racing=false;hidePanel();
+  const ok=await ask(g.q,{who:'🚧 محطة سؤال',retryUntilRight:true});
+  // lower barriers
+  g.state='opening';const t0=performance.now();sfx('boost',0.4,0.8);
+  await new Promise(r=>{const f=()=>{const k=Math.min(1,(performance.now()-t0)/900);g.bars.position.y=lerp(0,-6,k);if(k>=1)g.bars.visible=false;if(k<1)requestAnimationFrame(f);else r();};f();});
+  g.state='done';activeGate=null;racing=true;player.boost=2.2;$('#boost').hidden=false;}
+
+/* ================= modal ask ================= */
+function openModal(){$('#modal').hidden=false;const c=$('#mcard');c.className='card';c.innerHTML='';c.scrollTop=0;return c;}
+function closeModal(){$('#modal').hidden=true;stopVoice();}
+function ask(q,o){return new Promise(resolve=>{const c=openModal();let wrongs=0,locked=false;
+  c.appendChild(el('div','who',o.who||'سؤال'));const isAlif=q.cat==='alif';
+  if(isAlif){c.appendChild(el('p','','اخْتَرِ الحَرْفَ الأخير: ى أم ي؟'));c.appendChild(el('div','qtext',stemHTML(q,false))).style.fontSize='54px';}
+  else{const qt=el('h2','qtext');qt.textContent=q.q;c.appendChild(qt);}
+  const msg=el('p','',o.retry?'جرّب مرة ثانية 💪':'اختر الجواب الصحيح');c.appendChild(msg);
+  const sb=el('button','icon say','🔊');sb.onclick=()=>{tap();say(q.say);};c.appendChild(sb);
+  const opts=shuffle(q.options.slice());const row=el('div','row');const long=opts.some(x=>strip(x).length>16);
+  opts.forEach(val=>{const b=el('button','choice'+(long?' long':''));b.textContent=val;
+    b.onclick=async()=>{if(locked)return;
+      if(val===q.answer){locked=true;b.classList.add('right');beep(523,0.12);setTimeout(()=>beep(784,0.2),120);const first=wrongs===0;
+        if(first&&!o.noMastery){const bb=save.mastery[q.id]||0;save.mastery[q.id]=bb+1;persist();if(bb===0)updStars(true);}
+        if(isAlif)c.querySelector('.qtext').innerHTML=stemHTML(q,true);
+        msg.className='';msg.textContent=rnd(['أحسنت! 🎉','ممتاز! ⭐','رائع يا بطل! 💪']);await say(rnd(['fb_ok1','fb_ok2','fb_ok3','fb_ok4']));await say(q.explain);await sleep(300);closeModal();resolve(first);}
+      else{wrongs++;b.classList.add('wrong');beep(180,0.22,0.18,'triangle');vib(60);msg.className='again';msg.textContent='جرّب مرة ثانية 😊';say(rnd(['fb_no1','fb_no2']));
+        if(wrongs>=2)[...row.children].forEach(x=>{if(x.textContent===q.answer)x.classList.add('hint');});}};row.appendChild(b);});
+  c.appendChild(row);
+  if(o.back){const x=el('button','btn soft','رجوع');x.onclick=()=>{tap();closeModal();resolve(null);};c.appendChild(x);}
+  setTimeout(()=>say(q.say),250);});}
+
+/* ================= input ================= */
+function bindPad(id,dir){const b=$(id);const on=e=>{e.preventDefault();steerKeys[dir]=true;b.classList.add('on');autoTarget=null;};const off=()=>{steerKeys[dir]=false;b.classList.remove('on');};
+  b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off));}
+bindPad('#padL','l');bindPad('#padR','r');
+// touch anywhere on the screen halves also steers
+const touchDirs=new Map();
+$('#gl').addEventListener('pointerdown',e=>{if(phase!=='race')return;const d=e.clientX<innerWidth/2?'l':'r';touchDirs.set(e.pointerId,d);steerKeys[d]=true;autoTarget=null;});
+const tend=e=>{const d=touchDirs.get(e.pointerId);if(d){touchDirs.delete(e.pointerId);if(![...touchDirs.values()].includes(d))steerKeys[d]=false;}};
+['pointerup','pointercancel'].forEach(ev=>addEventListener(ev,tend,true));
+addEventListener('touchend',e=>{if(!e.touches.length){touchDirs.clear();steerKeys.l=steerKeys.r=false;$('#padL').classList.remove('on');$('#padR').classList.remove('on');}},true);
+addEventListener('blur',()=>{touchDirs.clear();steerKeys.l=steerKeys.r=false;});
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;const k=e.key;if(k==='ArrowLeft'||k==='a'||k==='A'){steerKeys.l=true;autoTarget=null;}if(k==='ArrowRight'||k==='d'||k==='D'){steerKeys.r=true;autoTarget=null;}if(k===' '&&phase==='race'){sfx('horn',0.5);}});
+addEventListener('keyup',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a'||k==='A')steerKeys.l=false;if(k==='ArrowRight'||k==='d'||k==='D')steerKeys.r=false;});
+$('#horn').onclick=()=>{sfx('horn',0.55);};
+
+/* ================= loop ================= */
+const clock=new THREE.Clock();let t=0;const camPos=new THREE.Vector3(),camLook=new THREE.Vector3();let miniT=0;
+function placeCar(c,dt,spinAng){const p=posAt(c.s,c.x);c.obj.position.set(p.x,0,p.z);c.obj.rotation.y=p.yaw+(c.yawOff||0)+(spinAng||0);
+  const w=c.obj.userData.wheels;if(w&&w.length)w.forEach(wh=>{wh.rotation.x-=c.v*dt/0.33;});}
+function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),0.05);t+=dt;
+  if(phase==='menu'){if(gCar){gSpin+=dt*0.5;gCar.rotation.y=gSpin;}const portrait=innerHeight>innerWidth,short=!portrait&&innerHeight<=520;camera.fov=portrait?62:50;camera.updateProjectionMatrix();const sh=short?3.4:0,rx=Math.cos(0.6),rz=-Math.sin(0.6);camera.position.set(Math.sin(0.6)*(portrait?11:9)+rx*sh,portrait?5.2:3.4,Math.cos(0.6)*(portrait?11:9)+rz*sh);camera.lookAt(rx*sh,portrait?-1.6:0.2,rz*sh);renderer.render(gScene,camera);return;}
+  if(!player||phase==='loading'){renderer.render(gScene,camera);return;}
+  // ----- player -----
+  const P=player;
+  if(phase==='race'&&racing&&!P.done){raceT+=dt;
+    let steerIn=(steerKeys.r?1:0)-(steerKeys.l?1:0);
+    if(autoTarget!==null&&!steerIn){const d=autoTarget-P.x;steerIn=Math.abs(d)<0.3?0:Math.sign(d);if(Math.abs(d)<0.3)P.x=lerp(P.x,autoTarget,0.2);}
+    steer=lerp(steer,steerIn,Math.min(1,dt*10));
+    // target speed
+    let vt=26.5;const nextG=gates.find(g=>g.state!=='done'&&g.lap===P.lap&&g.s>P.s-2);
+    if(nextG){const dist=nextG.s-P.s;if(nextG.state==='idle'&&dist<ZONE){activateGate(nextG);}
+      if(nextG.type==='lane'&&dist<ZONE)vt=15.5;
+      if(nextG.type==='stop'){if(dist<ZONE){vt=Math.max(0,Math.min(vt,(dist-6)*0.6));const br=nextG.bars;if(br&&nextG.state==='active'&&dist<60){br.visible=true;br.position.y=lerp(br.position.y,0,Math.min(1,dt*3));}}
+        if(dist<8&&nextG.state==='active'){P.v=0;stopGateAsk(nextG);}}
+      if(nextG.type==='lane'&&nextG.state==='active'&&P.s>=nextG.s)passLaneGate(nextG);}
+    if(P.boost>0){vt=39;P.boost-=dt;if(P.boost<=0)$('#boost').hidden=true;}
+    if(P.spin>0){vt=7;P.spin-=dt;}
+    P.v+= (vt-P.v)*Math.min(1,dt*(vt>P.v?1.1:2.5));
+    P.s+=P.v*dt;P.x=clamp(P.x+steer*9*dt,-ROAD_W/2+1.2,ROAD_W/2-1.2);
+    P.yawOff=lerp(P.yawOff||0,-steer*0.12*Math.min(1,P.v/15),Math.min(1,dt*8));
+    if(P.s>=L){P.s-=L;P.lap++;if(P.lap>=LAPS){P.done=true;finishOrder.push('you');finishRace();}else{toast('🏁 اللفة '+(P.lap+1));beep(988,0.1);setTimeout(()=>beep(1319,0.2),110);}}}
+  const spinAng=P.spin>0?(1.2-P.spin)*Math.PI*2.2:0;placeCar(P,dt,spinAng);
+  // ----- AI -----
+  ais.forEach(a=>{if(phase==='race'&&racing){
+      let vt=a.base;const gap=progOf(P)-progOf(a);if(!P.done){if(gap>70)vt+=3;else if(gap<-90)vt-=3.5;}
+      const ng=gates.find(g=>g.lap===a.lap&&g.s>a.s&&g.s-a.s<ZONE);if(ng&&!a.done)vt=Math.min(vt,ng.type==='stop'?17:15.5);
+      if(a.done)vt=14;
+      a.v+=(vt-a.v)*Math.min(1,dt*1.0);a.s+=a.v*dt;
+      a.laneT-=dt;if(a.laneT<=0){a.laneT=3+Math.random()*5;a.tx=rnd([-1,0,1])*LANE_W;}
+      // avoid player
+      const ds=progOf(a)-progOf(P);if(Math.abs(ds)<10&&Math.abs(a.tx-P.x)<2.5)a.tx=clamp(P.x+(P.x>0?-LANE_W:LANE_W),-LANE_W,LANE_W);
+      a.x=lerp(a.x,a.tx,Math.min(1,dt*1.5));
+      if(a.s>=L){a.s-=L;a.lap++;if(a.lap>=LAPS&&!a.done){a.done=true;finishOrder.push(a.name);}}}
+    placeCar(a,dt,0);
+    // bump with player
+    if(phase==='race'){const ds=progOf(a)-progOf(P);if(Math.abs(ds)<4.4&&Math.abs(a.x-P.x)<2.1){if(ds>0){P.v=Math.min(P.v,a.v-3);P.s-=0.15;}else{a.v=Math.min(a.v,P.v-3);}
+        P.x=clamp(P.x+(P.x>a.x?1:-1)*0.15,-ROAD_W/2+1.2,ROAD_W/2-1.2);if(t>P.bumpT){P.bumpT=t+0.8;sfx('bump',0.5);vib(25);}}}});
+  // cones flying
+  gates.forEach(g=>{if(g.cones)g.cones.children.forEach(c=>{const v=c.userData.v;if(!v)return;v.y-=18*dt;c.position.addScaledVector(v,dt);c.rotation.x+=dt*8;if(c.position.y<0&&v.y<0){c.position.y=0;v.set(0,0,0);c.userData.v=null;}});});
+  flags.forEach(f=>{const pos=f.geometry.attributes.position,b=f.userData.base;for(let i=0;i<pos.count;i++){const x=b[i*3];pos.array[i*3+2]=Math.sin(x*2.4+t*5)*0.16*((x+1.5)/3);}pos.needsUpdate=true;});
+  // engine
+  if(engine&&AC){const r=0.65+P.v/39*1.0;engine.s.playbackRate.setTargetAtTime(r,AC.currentTime,0.08);if(!vsrc)engine.g.gain.setTargetAtTime(phase==='race'?0.16+P.v/39*0.12:0,AC.currentTime,0.1);}
+  $('#spd').textContent=Math.round(P.v*3.6);
+  // camera (chase)
+  const back=P.boost>0?12.5:11;const cp=posAt(P.s-back,P.x*0.85);const lp=posAt(P.s+18,P.x*0.7);
+  camPos.lerp(new THREE.Vector3(cp.x,4.6+(P.boost>0?0.3:0),cp.z),Math.min(1,dt*6));camLook.lerp(new THREE.Vector3(lp.x,1.6,lp.z),Math.min(1,dt*8));
+  if(camPos.lengthSq()<1||camPos.distanceTo(new THREE.Vector3(cp.x,4.6,cp.z))>60){camPos.set(cp.x,4.6,cp.z);camLook.set(lp.x,1.6,lp.z);}
+  camera.position.copy(camPos);camera.lookAt(camLook);const fov=P.boost>0?70:60;if(Math.abs(camera.fov-fov)>0.2){camera.fov=lerp(camera.fov,fov,Math.min(1,dt*4));camera.updateProjectionMatrix();}
+  miniT-=dt;if(miniT<=0){miniT=0.15;drawMini();updHud();}
+  renderer.render(rScene,camera);}
+
+/* ================= minimap ================= */
+let miniPath=null;
+function drawMini(){const c=$('#mini');const g=c.getContext('2d');const W=c.width;
+  if(!miniPath){let minx=1e9,maxx=-1e9,minz=1e9,maxz=-1e9;for(let i=0;i<NS;i++){minx=Math.min(minx,PX[i]);maxx=Math.max(maxx,PX[i]);minz=Math.min(minz,PZ[i]);maxz=Math.max(maxz,PZ[i]);}
+    const k=(W-20)/Math.max(maxx-minx,maxz-minz);miniPath={k,ox:10-minx*k+((W-20)-(maxx-minx)*k)/2,oz:10-minz*k+((W-20)-(maxz-minz)*k)/2};}
+  const m=miniPath;const X=x=>m.ox+x*m.k,Z=z=>m.oz+z*m.k;g.clearRect(0,0,W,W);g.lineWidth=7;g.strokeStyle='#2B2A33';g.lineJoin='round';g.beginPath();for(let i=0;i<NS;i+=4){const x=X(PX[i]),z=Z(PZ[i]);i?g.lineTo(x,z):g.moveTo(x,z);}g.closePath();g.stroke();g.lineWidth=3;g.strokeStyle='#FFFFFF';g.stroke();
+  gates.forEach(gt=>{if(gt.state==='done'||gt.lap!==player.lap)return;const p=trackAt(gt.s);g.fillStyle=gt.type==='stop'?'#E39B00':'#FF6B57';g.fillRect(X(p.px)-3,Z(p.pz)-3,6,6);});
+  ais.forEach(a=>{const p=trackAt(a.s);g.fillStyle='#3FA2FF';g.beginPath();g.arc(X(p.px),Z(p.pz),4,0,7);g.fill();});
+  const p=trackAt(player.s);g.fillStyle='#FFD23F';g.strokeStyle='#2B2A33';g.lineWidth=2;g.beginPath();g.arc(X(p.px),Z(p.pz),6,0,7);g.fill();g.stroke();}
+
+/* ================= finish ================= */
+async function finishRace(){racing=false;phase='finish';hidePanel();$('#boost').hidden=true;
+  const pos=finishOrder.indexOf('you')+1;save.races=(save.races||0)+1;if(pos===1)save.wins=(save.wins||0)+1;persist();updStars();
+  sfx('cheer',0.7);confetti();await say(pos===1?'ev_first':'ev_finish');
+  // complete the order with cars still racing
+  const rest=ais.filter(a=>!finishOrder.includes(a.name)).sort((x,y)=>progOf(y)-progOf(x)).map(a=>a.name);const order=finishOrder.concat(rest);
+  const c=openModal();c.appendChild(el('h1','',pos===1?'🏆 المركز الأول!':(pos===2?'🥈 المركز الثاني':(pos===3?'🥉 المركز الثالث':'🏁 وصلت!'))));
+  c.appendChild(el('p','',pos===1?'أنت بطل السباق! جاوبت وسبقت الكل':'ممتاز! جاوب أسرع عشان النيترو يوصلك للأول 🔥'));
+  const pod=el('div','podium');const hs=[110,140,90];const cols=['#C7D2FE','#FFD23F','#FFC6A5'];[1,0,2].forEach((ix,k)=>{const nm=order[ix]==='you'?(save.name||'أنت'):order[ix];const d=el('div','pod','<b>'+(['🥇','🥈','🥉'][ix])+'</b>'+nm);d.style.height=hs[[1,0,2].indexOf(ix)]+'px';d.style.height=[140,110,90][ix]+'px';d.style.background=cols[ix];pod.appendChild(d);});c.appendChild(pod);
+  c.appendChild(el('div','pill','⭐ نجومك: '+mastered()+'/'+QS.length));
+  const again=el('button','btn wide','🏁 سباق ثاني');again.onclick=()=>{tap();closeModal();startRace();};c.appendChild(again);
+  const gar=el('button','btn soft wide','🚗 الكراج');gar.onclick=()=>{tap();closeModal();toGarage();};c.appendChild(gar);}
+function toGarage(){phase='menu';racing=false;engineStop();musicStop();stopVoice();hidePanel();['#hud','#mini','#speedo','#padL','#padR','#horn','#boost'].forEach(s=>$(s).hidden=true);$('#garage').hidden=false;updStars();showGarageCar();}
+$('#rPause').onclick=()=>{if(phase!=='race')return;tap();const was=racing;racing=false;const c=openModal();c.appendChild(el('h2','','⏸️ استراحة'));
+  const go=el('button','btn wide','▶️ كمّل السباق');go.onclick=()=>{tap();closeModal();racing=true;};c.appendChild(go);
+  const out=el('button','btn soft wide','🚗 ارجع للكراج');out.onclick=()=>{tap();closeModal();toGarage();};c.appendChild(out);};
+
+/* ================= story ================= */
+function openStory(){const c=openModal();c.appendChild(el('div','who','📖 قصة'));c.appendChild(el('div','stitle',LESSON.title));
+  const box=el('div','story');const lines=STORY.map((s,i)=>{const r=el('div','sline');r.appendChild(el('div','t',s.t));const b=el('button','','🔊');b.setAttribute('aria-label','اسمع');b.onclick=async()=>{tap();mark(i);await say(s.say);};r.appendChild(b);box.appendChild(r);return r;});c.appendChild(box);
+  function mark(i){lines.forEach((l,k)=>l.classList.toggle('cur',k===i));if(lines[i])lines[i].scrollIntoView({block:'nearest',behavior:'smooth'});}
+  let reading=false;const rb=el('button','btn wide','🎧 اقرأ معي (القصة كاملة)');rb.onclick=async()=>{tap();if(reading){reading=false;stopVoice();rb.textContent='🎧 اقرأ معي (القصة كاملة)';return;}reading=true;rb.textContent='⏹️ وقّف';
+    await say('st_title');for(let i=0;i<STORY.length&&reading;i++){mark(i);await say(STORY[i].say);await sleep(500);}reading=false;rb.textContent='🎧 اقرأ معي (القصة كاملة)';mark(-1);};c.appendChild(rb);
+  const qb=el('button','btn wide','✏️ أسئلة القصة');qb.style.background='#BDF0D4';qb.onclick=()=>{tap();reading=false;stopVoice();storyQuiz();};c.appendChild(qb);
+  const x=el('button','btn soft','رجوع');x.onclick=()=>{tap();reading=false;closeModal();};c.appendChild(x);say('ev_story');}
+async function storyQuiz(){const list=shuffle(QS.filter(q=>q.cat==='read')).slice(0,6);let right=0;
+  for(let i=0;i<list.length;i++){const r=await ask(list[i],{who:'📖 سؤال '+(i+1)+' من '+list.length,back:true});if(r===null){openStory();return;}if(r)right++;}
+  confetti();sfx('cheer',0.6);const c=openModal();c.appendChild(el('h1','','🌳 أحسنت!'));c.appendChild(el('p','','جاوبت '+right+' من '+list.length+' من أول مرة'));
+  const b=el('button','btn wide','رجوع للقصة');b.onclick=()=>{tap();openStory();};c.appendChild(b);const x=el('button','btn soft','الكراج');x.onclick=()=>{tap();closeModal();};c.appendChild(x);}
+
+/* ================= sentence workshop ================= */
+function openWork(){const c=openModal();const it=rnd(ORDER);const words=it.w;let ix=0,wr=0;
+  c.appendChild(el('div','who','🧩 ورشة الجمل'));c.appendChild(el('h2','','رتّب الكلمات وكوّن جملة فعلية'));
+  const msg=el('p','','ابدأ بالفعل! 🚗 الفعل أول كلمة');c.appendChild(msg);const sb=el('button','icon say','🔊');sb.onclick=()=>{tap();say(it.say);};c.appendChild(sb);
+  const slots=el('div','slots');c.appendChild(slots);const pool=el('div','wpool');
+  shuffle(words.map((w,k)=>({w,k}))).forEach(o=>{const b=el('button','wblock',o.w);b.onclick=async()=>{if(ix>=words.length)return;
+      if(o.w===words[ix]){tap();b.classList.add('used');const s=el('div','wslot'+(ix===0?' v':(ix===1?' s':'')),o.w+(ix===0?'<small>فعل</small>':(ix===1?'<small>فاعل</small>':'')));slots.appendChild(s);ix++;wr=0;pool.querySelectorAll('.hint').forEach(x=>x.classList.remove('hint'));
+        if(ix===1)msg.textContent='صح! هذا الفعل 👍 الحين: مَن قام بالفعل؟ (الفاعل)';else if(ix===2)msg.textContent='ممتاز! هذا الفاعل ⭐ كمّل الجملة';
+        if(ix>=words.length){msg.innerHTML='🎉 جملة فعلية صحيحة!';beep(523,0.12);setTimeout(()=>beep(784,0.2),120);confetti();await say(rnd(['fb_ok1','fb_ok3']));await say(it.say);
+          const nx=el('button','btn wide','جملة ثانية 🧩');nx.onclick=()=>{tap();openWork();};c.insertBefore(nx,back);}}
+      else{wr++;beep(180,0.2,0.16,'triangle');b.classList.remove('wrong');void b.offsetWidth;b.classList.add('wrong');msg.textContent=ix===0?'الجملة الفعلية تبدأ بالفعل 🤔':(ix===1?'بعد الفعل: الفاعل (مَن قام بالفعل؟)':'شوف أي كلمة تجي بعدها 🤔');
+        if(wr>=2)pool.querySelectorAll('.wblock').forEach(x=>{if(!x.classList.contains('used')&&x.textContent===words[ix])x.classList.add('hint');});}};pool.appendChild(b);});
+  c.appendChild(pool);const back=el('button','btn soft','رجوع');back.onclick=()=>{tap();closeModal();};c.appendChild(back);setTimeout(()=>say('ev_build'),200);}
+
+/* ================= book ================= */
+function openBook(){const c=openModal();c.classList.add('book');c.appendChild(el('h1','','📒 دفتر الدرس'));
+  const sec=(title,cls)=>{const s=el('div','sec '+cls,'<h3>'+title+'</h3><div class="body"></div>');c.appendChild(s);return s.querySelector('.body');};
+  const wc=(html,id)=>{const d=el('div','wcard','<div>'+html+'</div>');const b=el('button','','🔊');b.setAttribute('aria-label','اسمع');b.onclick=()=>{tap();say(id);};d.appendChild(b);return d;};
+  const b1=sec('🚗 الجملة الفعلية','c1');b1.appendChild(el('div','tip','الجملة الفعلية تبدأ بـ<b>فعل</b>، وبعده <b>الفاعل</b>: مَن قام بالفعل.<br><span class="read">ذَهَبَ (فعل) سالِمٌ (فاعل) إلى الحديقة.</span>'));
+  ORDER.slice(0,6).forEach(o=>b1.appendChild(wc('<b style="color:#1E6FB8">'+o.w[0]+'</b> '+o.w.slice(1).join(' '),o.say)));
+  const b2=sec('ى و ي في آخر الكلمة','c2');b2.appendChild(el('div','tip','<b>ى</b> (ألف مقصورة) نسمعها <b>ألِف</b> وما لها نقاط: <span class="read">مَشى، عَلى</span><br><b>ي</b> نسمعها <b>ياء</b> ولها نقطتان: <span class="read">يَمْشي، في</span>'));
+  QS.filter(q=>q.cat==='alif').slice(0,8).forEach(q=>b2.appendChild(wc(q.word,q.say)));
+  const b3=sec('التنوين ً ٌ ٍ','c3');b3.appendChild(el('div','tip','التنوين: نون ساكنة <b>ننطقها ولا نكتبها</b>.<br><span class="read">بابٌ</span> تنوين ضم · <span class="read">بابًا</span> تنوين فتح · <span class="read">بابٍ</span> تنوين كسر<br>تنوين الفتح نكتب بعده <b>ألفًا</b>: <span class="read">قَلَمًا</span> — إلا مع ة: <span class="read">شَجَرَةً</span>'));
+  QS.filter(q=>q.listen).slice(0,6).forEach(q=>b3.appendChild(wc(q.word,q.say)));
+  const b4=sec('📖 قصة: في حديقة الحي','c4');const sb=el('button','btn','افتح القصة 📖');sb.onclick=()=>{tap();openStory();};const w=el('div','tip');w.appendChild(sb);b4.appendChild(w);
+  const b5=sec('📊 تقدّمي','c5');const pg=el('div','prog');Object.keys(CAT_NAME).forEach(k=>{const list=QS.filter(q=>q.cat===k);const m=list.filter(q=>(save.mastery[q.id]||0)>0).length;pg.insertAdjacentHTML('beforeend','<span>'+CAT_NAME[k]+'</span><div class="bar"><i style="width:'+Math.round(m/list.length*100)+'%"></i></div><span>'+m+'/'+list.length+'</span>');});b5.appendChild(pg);
+  c.appendChild(el('div','credits','نماذج السيارات: Envato Elements · نموذج السيارة الرياضية: vicent091036 (CC BY 4.0) · الأصوات: ElevenLabs و Envato'));
+  const x=el('button','btn wide','رجوع');x.onclick=()=>{tap();closeModal();};c.appendChild(x);}
+
+/* ================= confetti ================= */
+function confetti(){if(reduced)return;const c=$('#confetti');const g=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;const cols=['#FF6B57','#FFD23F','#5CE1E6','#2BB673','#FF9EC7','#8A1538'];const P=[];
+  for(let i=0;i<120;i++)P.push({x:Math.random()*c.width,y:-20-Math.random()*c.height*0.5,r:6+Math.random()*7,c:rnd(cols),vx:(Math.random()-.5)*2,vy:2.5+Math.random()*3.5});
+  const t0=performance.now();(function f(now){g.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;g.fillStyle=p.c;g.fillRect(p.x,p.y,p.r,p.r);});if(now-t0<2400)requestAnimationFrame(f);else g.clearRect(0,0,c.width,c.height);})(t0);}
+
+/* ================= menu wiring ================= */
+function soundBtns(){['#gSound','#rSound'].forEach(s=>$(s).textContent=save.sound?'🔊':'🔇');}
+[$('#gSound'),$('#rSound')].forEach(b=>b.onclick=()=>{audioInit();save.sound=!save.sound;persist();soundBtns();if(!save.sound){stopVoice();engineStop();musicStop();}else if(phase==='race'){engineStart();musicStart();}});
+$('#btnRace').onclick=()=>{audioInit();tap();save.name=$('#nameInput').value.trim();persist();startRace();};
+$('#btnStory').onclick=()=>{audioInit();tap();openStory();};
+$('#btnWork').onclick=()=>{audioInit();tap();openWork();};
+$('#btnBook').onclick=()=>{audioInit();tap();openBook();};
+document.addEventListener('pointerdown',()=>{audioInit();if(phase==='menu')setTimeout(()=>say('ev_welcome'),300);},{once:true});
+
+/* ================= boot ================= */
+(async()=>{soundBtns();$('#nameInput').value=save.name||'';
+  try{setLoad(0.2);await loadGLB(CARS[save.car].file);setLoad(0.7);await showGarageCar();setLoad(1);}catch(e){console.error(e);$('#loadMsg').textContent='ما قدرت أحمّل السيارات… حدّث الصفحة 🙏';return;}
+  hideLoading();$('#garage').hidden=false;updStars();loop();
+  // warm other cars in background
+  CARS.forEach(c=>loadGLB(c.file).catch(()=>{}));loadGLB('m-park.txt').catch(()=>{});loadGLB('m-barrier.txt').catch(()=>{});
+  setTimeout(()=>{if(AC)say('ev_welcome');},600);})();
+</script>
+
+</body>
+</html>
